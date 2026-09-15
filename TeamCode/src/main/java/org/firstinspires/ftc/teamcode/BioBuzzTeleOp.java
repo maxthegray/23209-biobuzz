@@ -3,6 +3,9 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+
+GoBildaPinpointDriver pinpoint;
 
 @TeleOp(name = "Starter Drive", group = "teaching")
 public class BioBuzzTeleOp extends LinearOpMode {
@@ -12,6 +15,7 @@ public class BioBuzzTeleOp extends LinearOpMode {
         DcMotor frontRight = hardwareMap.get(DcMotor.class, "front_right");
         DcMotor backLeft = hardwareMap.get(DcMotor.class, "back_left");
         DcMotor backRight = hardwareMap.get(DcMotor.class, "back_right");
+        pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
 
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
         frontRight.setDirection(DcMotor.Direction.FORWARD);
