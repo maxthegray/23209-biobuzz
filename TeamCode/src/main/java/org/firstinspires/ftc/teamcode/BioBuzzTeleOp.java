@@ -4,7 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
-@TeleOp(name = "BioBuzz: Basic Drive", group = "23209")
+@TeleOp(name = "Starter Drive", group = "teaching")
 public class BioBuzzTeleOp extends LinearOpMode {
     @Override
     public void runOpMode() {
@@ -14,6 +14,8 @@ public class BioBuzzTeleOp extends LinearOpMode {
         DcMotor backRight = hardwareMap.get(DcMotor.class, "back_right");
 
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
+        frontRight.setDirection(DcMotor.Direction.FORWARD);
+        backRight.setDirection(DcMotor.Direction.FORWARD);
         backLeft.setDirection(DcMotor.Direction.REVERSE);
 
         frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -35,14 +37,10 @@ public class BioBuzzTeleOp extends LinearOpMode {
             double backLeftPower = drive - strafe + turn;
             double backRightPower = drive + strafe - turn;
 
-            double scale = Math.max(1.0, Math.max(
-                    Math.max(Math.abs(frontLeftPower), Math.abs(frontRightPower)),
-                    Math.max(Math.abs(backLeftPower), Math.abs(backRightPower))));
-
-            frontLeft.setPower(frontLeftPower / scale);
-            frontRight.setPower(frontRightPower / scale);
-            backLeft.setPower(backLeftPower / scale);
-            backRight.setPower(backRightPower / scale);
+            frontLeft.setPower(frontLeftPower);
+            frontRight.setPower(frontRightPower);
+            backLeft.setPower(backLeftPower);
+            backRight.setPower(backRightPower);
 
             telemetry.addData("Drive", "%.2f", drive);
             telemetry.addData("Strafe", "%.2f", strafe);
