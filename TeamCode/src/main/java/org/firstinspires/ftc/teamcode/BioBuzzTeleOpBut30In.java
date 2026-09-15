@@ -17,10 +17,10 @@ public class BioBuzzTeleOpBut30In extends LinearOpMode {
     public void runOpMode() {
 
         GoBildaPinpointDriver pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
-        DcMotor frontLeft = hardwareMap.get(DcMotor.class, "front_left");
-        DcMotor frontRight = hardwareMap.get(DcMotor.class, "front_right");
-        DcMotor backLeft = hardwareMap.get(DcMotor.class, "back_left");
-        DcMotor backRight = hardwareMap.get(DcMotor.class, "back_right");
+        DcMotor frontLeft = hardwareMap.get(DcMotor.class, "frontLeftMotor");
+        DcMotor frontRight = hardwareMap.get(DcMotor.class, "frontRightMotor");
+        DcMotor backLeft = hardwareMap.get(DcMotor.class, "backLeftMotor");
+        DcMotor backRight = hardwareMap.get(DcMotor.class, "backRightMotor");
 
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
         frontRight.setDirection(DcMotor.Direction.FORWARD);
