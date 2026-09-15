@@ -26,21 +26,22 @@ public class BioBuzzTeleOp extends LinearOpMode {
         telemetry.addLine("Ready");
         telemetry.update();
         waitForStart();
-
+        double scale = .5;
         while (opModeIsActive()) {
             double drive = -gamepad1.left_stick_y;
             double strafe = gamepad1.left_stick_x;
             double turn = gamepad1.right_stick_x;
+
 
             double frontLeftPower = drive + strafe + turn;
             double frontRightPower = drive - strafe - turn;
             double backLeftPower = drive - strafe + turn;
             double backRightPower = drive + strafe - turn;
 
-            frontLeft.setPower(frontLeftPower);
-            frontRight.setPower(frontRightPower);
-            backLeft.setPower(backLeftPower);
-            backRight.setPower(backRightPower);
+            frontLeft.setPower(frontLeftPower * scale);
+            frontRight.setPower(frontRightPower * scale);
+            backLeft.setPower(backLeftPower * scale);
+            backRight.setPower(backRightPower * scale);
 
             telemetry.addData("Drive", "%.2f", drive);
             telemetry.addData("Strafe", "%.2f", strafe);
