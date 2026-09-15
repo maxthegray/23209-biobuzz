@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -7,10 +8,14 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 
 GoBildaPinpointDriver pinpoint;
 
+import org.firstinspires.ftc.robotcontroller.external.samples.SensorGoBildaPinpoint;
+
 @TeleOp(name = "Starter Drive", group = "teaching")
 public class BioBuzzTeleOp extends LinearOpMode {
     @Override
     public void runOpMode() {
+
+        GoBildaPinpointDriver pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         DcMotor frontLeft = hardwareMap.get(DcMotor.class, "front_left");
         DcMotor frontRight = hardwareMap.get(DcMotor.class, "front_right");
         DcMotor backLeft = hardwareMap.get(DcMotor.class, "back_left");
