@@ -14,11 +14,12 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 public class BioBuzzTeleOp extends LinearOpMode {
     @Override
     public void runOpMode() {
+
+        GoBildaPinpointDriver pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         DcMotor frontLeft = hardwareMap.get(DcMotor.class, "front_left");
         DcMotor frontRight = hardwareMap.get(DcMotor.class, "front_right");
         DcMotor backLeft = hardwareMap.get(DcMotor.class, "back_left");
         DcMotor backRight = hardwareMap.get(DcMotor.class, "back_right");
-        GoBildaPinpointDriver pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
 
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
         frontRight.setDirection(DcMotor.Direction.FORWARD);
