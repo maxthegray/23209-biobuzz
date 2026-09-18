@@ -126,7 +126,7 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
 
                 // Front left and back left are +turn; Other 2 are -turn
                 double kP = 0.0025;
-                double turn = errorX * kP;
+                double turn = -errorX * kP;
 
                 frontLeft.setPower(turn);
                 frontRight.setPower(-turn);
