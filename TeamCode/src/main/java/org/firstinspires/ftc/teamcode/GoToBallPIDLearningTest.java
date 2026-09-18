@@ -22,14 +22,22 @@ import java.util.List;
 
 @TeleOp(name = "Go to Ball PID (Learning Test)", group = "teaching?")
 public class GoToBallPIDLearningTest extends LinearOpMode{
-
+//    private ColorBlobLocatorProcessor.Blob findClosestBall(List<ColorBlobLocatorProcessor.Blob> blobs){
+//        ColorBlobLocatorProcessor.Blob closestBall = null;
+//        double closestDistance = Double.MAX_VALUE;
+//        for (ColorBlobLocatorProcessor.Blob b : blobs) {
+//            Circle circleFit = b.getCircle();
+//
+//
+//        }
+//    }
 
     @Override
     public void runOpMode() {
-        DcMotor frontLeft = hardwareMap.get(DcMotor.class, "front_left");
-        DcMotor frontRight = hardwareMap.get(DcMotor.class, "front_right");
-        DcMotor backLeft = hardwareMap.get(DcMotor.class, "back_left");
-        DcMotor backRight = hardwareMap.get(DcMotor.class, "back_right");
+        DcMotor frontLeft = hardwareMap.get(DcMotor.class, "frontLeftMotor");
+        DcMotor frontRight = hardwareMap.get(DcMotor.class, "frontRightMotor");
+        DcMotor backLeft = hardwareMap.get(DcMotor.class, "backLeftMotor");
+        DcMotor backRight = hardwareMap.get(DcMotor.class, "backRightMotor");
 
         frontLeft.setDirection(DcMotor.Direction.REVERSE);
         frontRight.setDirection(DcMotor.Direction.FORWARD);
@@ -46,7 +54,7 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
         final double camCenterY = 120;
 
         ColorBlobLocatorProcessor colorLocator = new ColorBlobLocatorProcessor.Builder()
-                .setTargetColorRange(ColorRange.ARTIFACT_PURPLE)   // Use a predefined color match
+                .setTargetColorRange(ColorRange.YELLOW)   // Use a predefined color match
                 .setContourMode(ColorBlobLocatorProcessor.ContourMode.EXTERNAL_ONLY)
                 .setRoi(ImageRegion.asUnityCenterCoordinates(-0.75, 0.75, 0.75, -0.75))
                 .setDrawContours(true)   // Show contours on the Stream Preview
@@ -65,6 +73,8 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
                 .addProcessor(colorLocator)
                 .setCameraResolution(new Size(320, 240))
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
+
+                .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
                 .build();
 
 //        telemetry.setMsTransmissionInterval(100);   // Speed up telemetry updates for debugging.
@@ -96,15 +106,15 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
             if (!blobs.isEmpty()){
                 ColorBlobLocatorProcessor.Blob b = blobs.get(0);
                 Circle circleFit = b.getCircle();
-//                double radius = circleFit.getRadius();
+                double radius = circleFit.getRadius();
                 double centerX = circleFit.getX();
-//                double centerY = circleFit.getY();
+                double centerY = circleFit.getY();
 
                 double errorX = centerX - camCenterX;
 //                double errorY = centerY - camCenterY;
 
                 // Front left and back left are +turn; Other 2 are -turn
-                double kP = 0.005;
+                double kP = 0.001;
                 double turn = errorX * kP;
 
                 frontLeft.setPower(turn);
