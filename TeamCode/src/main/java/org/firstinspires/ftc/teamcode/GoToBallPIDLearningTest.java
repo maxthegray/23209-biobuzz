@@ -89,7 +89,7 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
 
             ColorBlobLocatorProcessor.Util.filterByCriteria(
                     ColorBlobLocatorProcessor.BlobCriteria.BY_CONTOUR_AREA,
-                    50, 20000, blobs);  // filter out very small blobs.
+                    50, 1000, blobs);  // filter out very small blobs.
 
             ColorBlobLocatorProcessor.Util.filterByCriteria(
                     ColorBlobLocatorProcessor.BlobCriteria.BY_CIRCULARITY,
@@ -104,7 +104,18 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
 //            }
 
             if (!blobs.isEmpty()){
+                double maxRadius = 0.0;
+
                 ColorBlobLocatorProcessor.Blob b = blobs.get(0);
+
+                for(ColorBlobLocatorProcessor.Blob testBlob : blobs) {
+                    Circle circleFit = testBlob.getCircle();
+                    if(circleFit.getRadius() > maxRadius) {
+                        maxRadius = circleFit.getRadius();
+                        b = testBlob;
+                    }
+                }
+
                 Circle circleFit = b.getCircle();
                 double radius = circleFit.getRadius();
                 double centerX = circleFit.getX();
@@ -114,12 +125,12 @@ public class GoToBallPIDLearningTest extends LinearOpMode{
 //                double errorY = centerY - camCenterY;
 
                 // Front left and back left are +turn; Other 2 are -turn
-                double kP = 0.001;
-                double turn = errorX * kP;
+                double kP = 0.0025;
+                double turn = -errorX * kP;
 
                 frontLeft.setPower(turn);
                 frontRight.setPower(-turn);
-                backLeft.setPower(turn );
+                backLeft.setPower(turn);
                 backRight.setPower(-turn);
                 telemetry.addLine("Ball found, moving.");
             } else {
