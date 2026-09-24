@@ -60,20 +60,9 @@ public class GoToBallPIDNew extends LinearOpMode {
 
     // the built in YELLOW lets in anything slightly warm, this is pickier
     // numbers are brightness, redness, blueness. real yellow = bright, kinda red, not blue at all
-    private static final Scalar yellowLow = new Scalar(80, 135, 0);
+    private static final Scalar yellowLow = new Scalar(40, 135, 0);   // 40 so the shady half of the ball still counts
     private static final Scalar yellowHigh = new Scalar(255, 180, 100);
 
-    private static final double tooSmolArea = 300 * zoominess * zoominess;
-    private static final double tooChonkyArea = 30000 * zoominess * zoominess;
-
-    // yellow alone grabs the floor and people's arms, so also check it's ball shaped
-    private static final double minRoundness = 0.65;        // 1.0 = perfect circle
-    private static final double minSolidness = 0.85;        // no holes
-    private static final double maxSquishedness = 1.45;        // not a long smear
-
-    // stops it flip flopping between two balls
-    private static final double maxTeleportPx = 80 * zoominess;
-    private static final int patienceFrames = 10;
 
     private static double kP = 0.0040 / zoominess;
     private static double kD = 0.0006 / zoominess;
@@ -156,9 +145,7 @@ public class GoToBallPIDNew extends LinearOpMode {
             freezeTheEyeball(portal, squintMs, brightnessJuice);
         }
 
-        double lastSeenX = 0, lastSeenY = 0;
-        boolean lockedOn = false;
-        int ghostedFrames = 0;
+        double  lastSeenX = 0;
 
         double windup = 0;
         double errorLastTime = 0;
@@ -211,59 +198,15 @@ public class GoToBallPIDNew extends LinearOpMode {
 
             List<ColorBlobLocatorProcessor.Blob> blobs = colorLocator.getBlobs();
 
-            // count after each check so telemetry can show which one ate the ball
-            int foundAnything = blobs.size();
-            ColorBlobLocatorProcessor.Util.filterByCriteria(
-                    ColorBlobLocatorProcessor.BlobCriteria.BY_CONTOUR_AREA,
-                    tooSmolArea, tooChonkyArea, blobs);
-            int rightSize = blobs.size();
-            ColorBlobLocatorProcessor.Util.filterByCriteria(
-                    ColorBlobLocatorProcessor.BlobCriteria.BY_CIRCULARITY,
-                    minRoundness, 1.0, blobs);
-            int roundEnough = blobs.size();
-            ColorBlobLocatorProcessor.Util.filterByCriteria(
-                    ColorBlobLocatorProcessor.BlobCriteria.BY_DENSITY,
-                    minSolidness, 1.0, blobs);
-            int solidEnough = blobs.size();
-            ColorBlobLocatorProcessor.Util.filterByCriteria(
-                    ColorBlobLocatorProcessor.BlobCriteria.BY_ASPECT_RATIO,
-                    1.0, maxSquishedness, blobs);
-            int ballShaped = blobs.size();
-
-            ColorBlobLocatorProcessor.Blob b = null;
-
-            if (!blobs.isEmpty()) {
-                if (lockedOn) {
-                    // stick with the ball we already picked
-                    double closestSoFar = Double.MAX_VALUE;
-                    for (ColorBlobLocatorProcessor.Blob suspect : blobs) {
-                        Circle ring = suspect.getCircle();
-                        double howFarItMoved = Math.hypot(ring.getX() - lastSeenX,
-                                ring.getY() - lastSeenY);
-                        if (howFarItMoved < closestSoFar) {
-                            closestSoFar = howFarItMoved;
-                            b = suspect;
-                        }
-                    }
-                    if (closestSoFar > maxTeleportPx) {
-                        b = null;            // balls don't teleport, so this isn't ours
-                    }
-                }
-
-                if (b == null) {
-                    b = blobs.get(0);            // biggest, already sorted for us
-                }
-            }
+            // one ball for now, the camera is the truth, so the biggest yellow blob is the ball
+            ColorBlobLocatorProcessor.Blob b = blobs.isEmpty() ? null : blobs.get(0);
 
             double turn = 0, scoot = 0, errorX = 0, radius = 0;
 
             if (b != null) {
                 Circle ring = b.getCircle();
                 lastSeenX = ring.getX();
-                lastSeenY = ring.getY();
                 radius = ring.getRadius();
-                lockedOn = true;
-                ghostedFrames = 0;
 
                 errorX = lastSeenX - camCenterX;            // + means ball is to the right
 
@@ -322,12 +265,8 @@ public class GoToBallPIDNew extends LinearOpMode {
                 lastPicX = -1;            // so a ball we find again counts as a new picture
                 heldSpin = 0;
                 heldScoot = 0;
-                ghostedFrames++;
-                if (ghostedFrames > patienceFrames) {
-                    lockedOn = false;
-                    windup = 0;
-                    haveOldError = false;
-                }
+                windup = 0;
+                haveOldError = false;
             }
 
             boolean wheelsHot = started && (!needBumperHeld || gamepad1.right_bumper);
@@ -355,16 +294,14 @@ public class GoToBallPIDNew extends LinearOpMode {
                         : wheelsHot ? "** WHEELS HOT **" : "safe (hold RB to go)");
                 telemetry.addData("Loop", "%.0f Hz", 1.0 / dt);
 
-                // whichever number hits 0 is your problem
-                telemetry.addData("Survivors", "saw %d > size %d > round %d > solid %d > ballish %d",
-                        foundAnything, rightSize, roundEnough, solidEnough, ballShaped);
+                telemetry.addData("Yellow blobs", "%d", blobs.size());
 
                 if (b != null) {
                     telemetry.addData("Ball", "x=%.0f        off by %+.0f px        r=%.0f",
                             lastSeenX, errorX, radius);
                     telemetry.addData("Doing", "turn=%+.3f        scoot=%+.3f", turn, scoot);
                 } else {
-                    telemetry.addLine("nothing ball shaped out there");
+                    telemetry.addLine("no yellow out there");
                 }
 
                 telemetry.addLine();
@@ -413,6 +350,8 @@ public class GoToBallPIDNew extends LinearOpMode {
                 squint.setExposure(openForMs, TimeUnit.MILLISECONDS);
                 sleep(20);
             }
+            // scootAllowed = != ScootAllowed;
+            // gamepad.wasY
 
             GainControl brightness = portal.getCameraControl(GainControl.class);
             if (brightness != null) {
