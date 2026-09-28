@@ -4,12 +4,14 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 @TeleOp(name = "Shooter Velocity Test", group = "test")
 public class ShooterVelocityTest extends LinearOpMode {
     @Override
     public void runOpMode() {
         DcMotorEx shooter = hardwareMap.get(DcMotorEx.class, "shooter");
+        shooter.setDirection(DcMotorSimple.Direction.REVERSE);
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
@@ -40,6 +42,8 @@ public class ShooterVelocityTest extends LinearOpMode {
             telemetry.addData("target (ticks/s)", target);
             telemetry.addData("current (ticks/s)", "%.1f", shooter.getVelocity());
             telemetry.addData("step", step);
+            telemetry.addData("power", "%.2f", shooter.getPower());
+            telemetry.addData("encoder position", shooter.getCurrentPosition());
             telemetry.addLine("triangle/x: +/- step | cirlce/square: step x10 /10 | R1: toggle on/off | L1: zero");
             telemetry.update();
         }
