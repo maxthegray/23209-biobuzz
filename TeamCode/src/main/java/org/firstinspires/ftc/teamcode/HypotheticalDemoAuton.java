@@ -4,8 +4,8 @@ import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.Servo;
+// import com.qualcomm.robotcore.hardware.DcMotorEx;   // turn back on with the shooter
+// import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
@@ -27,6 +27,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
  *   3. go round to the rear side, our raised cell flipped over there after the tip, launch again
  *   4. park partly in our loading zone off the wall = leave 3 + park 5
  *   if the clock runs low we skip straight to parking
+ *
+ * no shooter or intake on the bot yet, so launching and slurping are just timed waits
+ * that hold the robot still for as long as the real thing would take.
  *
  * INIT controls: dpad left = red, dpad right = blue, dpad up = audience wall start, dpad down = alliance wall start
  */
@@ -78,21 +81,24 @@ public class HypotheticalDemoAuton extends LinearOpMode {
     private static final double closeEnoughIn = 1.0;
     private static final double closeEnoughDeg = 2.0;
 
-    // ---------- mechanisms (none of these exist yet, the code skips them if they're missing) ----------
+    // ---------- pretend mechanisms (no shooter or intake mounted yet) ----------
 
-    private static final double launcherTicksPerSec = 1800;   // guess, tune on the real flywheel
-    private static final double feederPush = 0.8;
-    private static final double feederRest = 0.2;
-    private static final long feederBeatMs = 350;
-    private static final long slurpMs = 1500;   // intake time per flower
+    private static final long launchMsPerBall = 700;   // guess at how long one shot takes
+    private static final long slurpMs = 1500;   // guess at intake time per flower
+
+    // real shooter settings, turn back on once it's mounted
+    // private static final double launcherTicksPerSec = 1800;   // guess, tune on the real flywheel
+    // private static final double feederPush = 0.8;
+    // private static final double feederRest = 0.2;
+    // private static final long feederBeatMs = 350;
     private static final int maxBallsHeld = 4;   // G407, never control more than 4
     private static final int ballsPerFlower = 2;   // 2 + 2 keeps us at 4, needs a real ball counter later
 
     private DcMotor frontLeft, frontRight, backLeft, backRight;
     private GoBildaPinpointDriver pinpoint;
-    private DcMotorEx launcher;
-    private Servo feeder;
-    private DcMotor intake;
+    // private DcMotorEx launcher;
+    // private Servo feeder;
+    // private DcMotor intake;
 
     private final ElapsedTime autoClock = new ElapsedTime();
     private boolean isBlue = false;
@@ -123,17 +129,12 @@ public class HypotheticalDemoAuton extends LinearOpMode {
                                       GoBildaPinpointDriver.EncoderDirection.FORWARD);
         pinpoint.resetPosAndIMU();
 
-        // tryGet = null instead of a crash when the part isn't on the robot yet
-        launcher = hardwareMap.tryGet(DcMotorEx.class, "launcher");
-        feeder = hardwareMap.tryGet(Servo.class, "feeder");
-        intake = hardwareMap.tryGet(DcMotor.class, "intake");
-
-        if (launcher != null) {
-            launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        }
-        if (feeder != null) {
-            feeder.setPosition(feederRest);
-        }
+        // shooter + intake hookup, turn back on once they're mounted
+        // launcher = hardwareMap.get(DcMotorEx.class, "launcher");
+        // feeder = hardwareMap.get(Servo.class, "feeder");
+        // intake = hardwareMap.get(DcMotor.class, "intake");
+        // launcher.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        // feeder.setPosition(feederRest);
 
         // pick alliance + start during INIT
         boolean useAudienceStart = true;
@@ -146,9 +147,6 @@ public class HypotheticalDemoAuton extends LinearOpMode {
             telemetry.addData("Alliance", "%s  (dpad left red / right blue)", isBlue ? "BLUE" : "RED");
             telemetry.addData("Start", "%s  (dpad up / down)", useAudienceStart ? "audience wall" : "alliance wall");
             telemetry.addData("Pinpoint", pinpoint.getDeviceStatus());
-            telemetry.addData("Launcher / feeder / intake", "%s / %s / %s",
-                    launcher != null ? "yes" : "MISSING", feeder != null ? "yes" : "MISSING",
-                    intake != null ? "yes" : "MISSING");
             telemetry.addLine("robot must touch the wall, stay on our side, 4 pollen touching it (G304)");
             telemetry.update();
         }
@@ -161,7 +159,7 @@ public class HypotheticalDemoAuton extends LinearOpMode {
         pinpoint.setPosition(new Pose2D(DistanceUnit.INCH, here.x, here.y, AngleUnit.DEGREES, here.h));
 
         // 1. launch the preloads into the raised cell (audience side at the start)
-        spinUpLauncher();
+        // spinUpLauncher();
         if (useAudienceStart) {
             aimAndLaunch(cellX, hiveLaneY);   // already lined up, just fire
         } else {
@@ -186,8 +184,8 @@ public class HypotheticalDemoAuton extends LinearOpMode {
         if (stillOnTime && ballsOnBoard > 0) aimAndLaunch(-cellX, hiveLaneY);
 
         // 4. park, always, even if we bailed early
-        spinDownLauncher();
-        if (intake != null) intake.setPower(0);
+        // spinDownLauncher();
+        // intake.setPower(0);
         driveTo(parkSpot, zoomSpeed);
         stopWheels();
 
@@ -273,15 +271,15 @@ public class HypotheticalDemoAuton extends LinearOpMode {
 
     // ---------- launching ----------
 
-    private void spinUpLauncher() {
-        if (launcher != null) launcher.setVelocity(launcherTicksPerSec);
-    }
+    // private void spinUpLauncher() {
+    //     launcher.setVelocity(launcherTicksPerSec);
+    // }
 
-    private void spinDownLauncher() {
-        if (launcher != null) launcher.setVelocity(0);
-    }
+    // private void spinDownLauncher() {
+    //     launcher.setVelocity(0);
+    // }
 
-    // turn in place to face the cell, wait for the flywheel, then feed every ball we have
+    // turn in place to face the cell, then sit still for as long as shooting would take
     private void aimAndLaunch(double redCellX, double redCellY) {
         Spot cell = forUs(new Spot(redCellX, redCellY, 0));
 
@@ -294,22 +292,22 @@ public class HypotheticalDemoAuton extends LinearOpMode {
         // aim spot is already in our alliance's coords, so undo forUs before handing it to driveTo
         if (!driveTo(forUs(new Spot(x, y, faceIt)), zoomSpeed)) return;
 
-        spinUpLauncher();
-        ElapsedTime waitForWheel = new ElapsedTime();
-        while (opModeIsActive() && launcher != null && waitForWheel.seconds() < 1.5
-                && launcher.getVelocity() < launcherTicksPerSec * 0.95) {
-            idle();
-        }
+        // wait for the flywheel to get up to speed
+        // spinUpLauncher();
+        // ElapsedTime waitForWheel = new ElapsedTime();
+        // while (opModeIsActive() && waitForWheel.seconds() < 1.5
+        //         && launcher.getVelocity() < launcherTicksPerSec * 0.95) {
+        //     idle();
+        // }
 
         while (opModeIsActive() && ballsOnBoard > 0 && autoClock.seconds() < hardStopAt) {
-            if (feeder != null) {
-                feeder.setPosition(feederPush);
-                sleep(feederBeatMs);
-                feeder.setPosition(feederRest);
-                sleep(feederBeatMs);
-            } else {
-                sleep(feederBeatMs * 2);   // pretend, so the timing still feels real
-            }
+            sleep(launchMsPerBall);   // delete this line once the feeder below is on
+
+            // push one ball into the flywheel
+            // feeder.setPosition(feederPush);
+            // sleep(feederBeatMs);
+            // feeder.setPosition(feederRest);
+            // sleep(feederBeatMs);
             ballsOnBoard--;
             telemetry.addData("Launched", "%d left", ballsOnBoard);
             telemetry.update();
@@ -318,14 +316,14 @@ public class HypotheticalDemoAuton extends LinearOpMode {
 
     // ---------- flowers ----------
 
-    // intake runs while we sit at the retrieval opening, only pollen comes out the bottom (G418)
+    // sit at the retrieval opening like an intake would, only pollen comes out the bottom (G418)
     private void slurpFlower() {
         int room = maxBallsHeld - ballsOnBoard;
         if (room <= 0) return;   // already full, G407
 
-        if (intake != null) intake.setPower(1.0);
-        sleep(slurpMs);
-        if (intake != null) intake.setPower(0);
+        // intake.setPower(1.0);
+        sleep(slurpMs);   // how long the intake runs
+        // intake.setPower(0);
 
         ballsOnBoard += Math.min(room, ballsPerFlower);
     }
