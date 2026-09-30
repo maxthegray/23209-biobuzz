@@ -40,7 +40,7 @@ public class ShooterVelocityTest extends LinearOpMode {
 
             telemetry.addData("running", running);
             telemetry.addData("target (ticks/s)", target);
-            telemetry.addData("current (ticks/s)", "%.1f", shooter.getVelocity());
+            telemetry.addData("current (ticks/s)", "%.2f", shooter.getVelocity());
             telemetry.addData("step", step);
             telemetry.addData("power", "%.2f", shooter.getPower());
             telemetry.addData("encoder position", shooter.getCurrentPosition());
