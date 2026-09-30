@@ -13,6 +13,7 @@ import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 // sensor bot settings for pedro pathing v3. every number here gets replaced by autotune
 public class Constants {
@@ -34,15 +35,27 @@ public class Constants {
 
     // step 2: PinpointTuner fills in the offsets (inches) and pod directions
     // known bug (pedro issue #185): it can flip the strafe pod sign, double check it by hand
-    public static PinpointConfig localizerConfig = new PinpointConfig(
-            c -> {
-                c.name.set("pinpoint");
-                c.xPodOffset.set(0.0);   // not measured yet
-                c.yPodOffset.set(0.0);   // not measured yet
-                c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
-                c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
-            }
-    );
+    
+    // public static PinpointConfig localizerConfig = new PinpointConfig(
+    //         c -> {
+    //             c.name.set("pinpoint");
+    //             c.xPodOffset.set(0.0);   // not measured yet
+    //             c.yPodOffset.set(0.0);   // not measured yet
+    //             c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+    //             c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+    //         }
+    // );
+
+    public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
+        c.name.set("pinpoint");
+        c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        c.xPodOffset.set(-1.0628417908676027);
+        c.yPodOffset.set(3.15188430425689);
+        c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        c.globalDistanceUnit.set(DistanceUnit.INCH);
+        c.offsetUnits.set(DistanceUnit.INCH);
+    });
 
     // step 3: ForesightTuner replaces ALL of these. they're the example robot from the pedro docs, not ours
     public static ForesightConfig foresightConfig = new ForesightConfig(
