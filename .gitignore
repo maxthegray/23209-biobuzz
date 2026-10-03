@@ -80,3 +80,8 @@ lint/outputs/
 lint/tmp/
 # lint/reports/
 .vscode/settings.json
+
+# Eclipse
+.project
+.classpath
+.settings/
