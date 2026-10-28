@@ -144,7 +144,7 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private boolean pickUp(Pose lineup, Pose pickup, Pose backup) {
         status = "Lining up";
-        if (!driveTo(lineup, fastSpeed, 0.4, 1)) return false;   // turn late so we don't clip the wall we're leaving
+        if (!driveTo(lineup, fastSpeed, 0.3, 0.9)) return false;   // wait for the corners to clear the wall, done turning before we get there
         return intakeAndBackUp(pickup, backup);
     }
 
@@ -188,9 +188,15 @@ public class PathDemoAllCombos extends LinearOpMode {
         Pose here = follower.pose();
         Pose target = mirrorIfBlue(redTarget);
 
+        // a 180 can go either way depending on sensor noise, so those always go ccw through the halfway heading
+        double turn = Math.atan2(Math.sin(target.heading() - here.heading()), Math.cos(target.heading() - here.heading()));
+        if (turn < Math.toRadians(-170)) turn += 2 * Math.PI;
+        double halfway = here.heading() + turn / 2;
+
         PiecewiseInterpolator heading = Interpolator.piecewise();
         if (turnStart > 0) heading.until(turnStart, Interpolator.constant(here.heading()));
-        heading.until(turnEnd, Interpolator.linear(here.heading(), target.heading()));
+        heading.until((turnStart + turnEnd) / 2, Interpolator.linear(here.heading(), halfway));
+        heading.until(turnEnd, Interpolator.linear(halfway, target.heading()));
         if (turnEnd < 1) heading.until(1, Interpolator.constant(target.heading()));
 
         return follow(line(here, target).heading(heading), speed);
