@@ -47,7 +47,7 @@ public class Constants {
         c.name.set("pinpoint");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         c.xPodOffset.set(-3.220380347544753);
-        c.yPodOffset.set(0.717855813935047);
+        c.yPodOffset.set(0.0);
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
         c.globalDistanceUnit.set(DistanceUnit.INCH);
@@ -69,7 +69,8 @@ public class Constants {
                 c.coast.set(Controller.proportionalFeedforward(0.008317315818631975));
                 c.brake.set(Controller.proportionalFeedforward(0.007069718445837179));
 
-                c.headingFeedback.set(Controller.proportional(7.0912011875081555));
+                // TEST: lowered to 3.0 to stop rotational jitter at rest. original: 7.0912011875081555
+                c.headingFeedback.set(Controller.proportional(3.0));
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(0.10744791340779461, 0.006264631361127194));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.18552051491361324, 0.10012107419859242));
