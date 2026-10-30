@@ -30,8 +30,9 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final Pose audienceShootPose = pose(hiveX, 14, 90);   // 5 in off the wall so the turn doesn't scrape
     private static final Pose rearShootPose = pose(hiveX, 116, -90);
 
-    private static final Pose gardenLineup = pose(11, 24, -90);
-    private static final Pose gardenPickup = pose(11, 12, -90);
+    private static final Pose gardenTurnSpot = pose(36, 30, -90);   // do the 180 out here, nowhere near a wall
+    private static final Pose gardenLineup = pose(12, 24, -90);
+    private static final Pose gardenPickup = pose(12, 12, -90);
     private static final Pose gardenBackup = pose(22, 24, -90);
     private static final Pose swoopControl = new Pose(22, 116);
 
@@ -51,6 +52,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double parkBuffer = 1.5;
 
     private static final double fastSpeed = 0.8;
+    private static final double nearWallSpeed = 0.5;
     private static final double slowSpeed = 0.35;
 
     private static final long shotMs = 700;
@@ -67,6 +69,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private String status = "Starting";
     private final List<String> stepLog = new ArrayList<>();
     private double lastStepTime = 0;
+    private double worstLag = 0;
 
     @Override
     public void runOpMode() {
@@ -110,7 +113,8 @@ public class PathDemoAllCombos extends LinearOpMode {
         if (!step("Tip check", checkTip())) return false;
 
         if (hiveTipped) {
-            if (!step("Garden", pickUp(gardenLineup, gardenPickup, gardenBackup))) return false;
+            if (!step("Garden lineup", lineUpForGarden())) return false;
+            if (!step("Garden", intakeAndBackUp(gardenPickup, gardenBackup))) return false;
             if (!step("Swoop to rear", swoopToRearShoot())) return false;
             if (!step("Shoot garden balls", shoot())) return false;
             if (!step("Rear flower", pickUp(rearFlowerLineup, rearFlowerPickup, rearFlowerLineup))) return false;
@@ -136,7 +140,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         return true;
     }
 
-    // limelight version is in HypotheticalDemoAuton, this just uses what was picked in init
+    // will use the limelight later, for now this just uses what was picked in init
     private boolean checkTip() {
         status = "Tip check (simulated): " + (hiveTipped ? "tipped" : "not tipped");
         return waitMs(tipCheckMs);
@@ -146,6 +150,13 @@ public class PathDemoAllCombos extends LinearOpMode {
         status = "Lining up";
         if (!driveTo(lineup, fastSpeed, 0.3, 0.9)) return false;   // wait for the corners to clear the wall, done turning before we get there
         return intakeAndBackUp(pickup, backup);
+    }
+
+    private boolean lineUpForGarden() {
+        status = "Turning for the garden";
+        if (!driveTo(gardenTurnSpot, fastSpeed, 0.35, 0.9)) return false;   // go straight till the corners clear the start wall
+        status = "Lining up";
+        return driveTo(gardenLineup, nearWallSpeed, 0, 0.5);   // only 3 in off the wall here so any leftover turn happens early
     }
 
     private boolean intakeAndBackUp(Pose pickup, Pose backup) {
@@ -208,6 +219,8 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (outOfTime()) return false;
             follower.update();
             if (!follower.following()) return true;   // pedro switches to holding when the path ends
+            Object headingError = follower.debug().algorithm().get("headingError");
+            if (headingError instanceof Double) worstLag = Math.max(worstLag, Math.abs(Math.toDegrees((Double) headingError)));
             updateTelemetry();
         }
         return false;
@@ -246,8 +259,10 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private void logStep(String name) {
         double now = timer.seconds();
-        stepLog.add(String.format("%-22s %4.1f s  (at %4.1f)", name, now - lastStepTime, now));
+        // lag = most the heading fell behind the path during that step
+        stepLog.add(String.format("%-20s %4.1f s (at %4.1f) lag %3.0f", name, now - lastStepTime, now, worstLag));
         lastStepTime = now;
+        worstLag = 0;
     }
 
     // blue is red rotated 180 around the field center, so doing this twice gets you back
