@@ -15,7 +15,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
-// sensor bot settings for pedro pathing v3. every number here gets replaced by autotune
+// sensor bot settings for pedro pathing v3. all three blocks came from autotune
 public class Constants {
 
     // step 1: MecanumTuner checks these directions, names match the robot config
@@ -55,13 +55,15 @@ public class Constants {
     });
 
 
-    // step 3: ForesightTuner replaces ALL of these. they're the example robot from the pedro docs, not ours
+    // step 3: ForesightTuner results (tuned on our sensor bot 2026-10-21). rerun it if the drivetrain changes
     public static ForesightConfig foresightConfig = new ForesightConfig(
             c -> {
                 Controller primaryTranslationalForward = Controller.proportional(0.3859305130404934);
                 Controller secondaryTranslationalForward = Controller.proportional(0.14259101231523041);
                 Controller primaryTranslationalLateral = Controller.proportional(0.649893858954874);
                 Controller secondaryTranslationalLateral = Controller.proportional(0.24011841540008994);
+                Controller primaryHeading = Controller.proportional(7.0912011875081555);
+                Controller secondaryHeading = Controller.proportional(3.0);   // anything stronger jittered at rest
 
                 c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
                 c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
@@ -69,8 +71,9 @@ public class Constants {
                 c.coast.set(Controller.proportionalFeedforward(0.008317315818631975));
                 c.brake.set(Controller.proportionalFeedforward(0.007069718445837179));
 
-                // TEST: lowered to 3.0 to stop rotational jitter at rest. original: 7.0912011875081555
-                c.headingFeedback.set(Controller.proportional(3.0));
+                // gentle when within 5 deg so it doesn't jitter, full autotune strength for real turns
+                c.headingFeedback.set(Controller.piecewise(secondaryHeading).put(Math.toRadians(5), primaryHeading));
+                c.cosineScale.set(true);   // stops driving forward when the heading falls way behind so the turn can catch up
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(0.10744791340779461, 0.006264631361127194));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.18552051491361324, 0.10012107419859242));
