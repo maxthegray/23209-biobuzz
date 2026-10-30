@@ -5,6 +5,7 @@ import static com.pedropathing.api.Paths.line;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
+import com.pedropathing.math.Velocity;
 import com.pedropathing.paths.Path;
 import com.pedropathing.paths.interpolator.Interpolator;
 import com.pedropathing.paths.interpolator.PiecewiseInterpolator;
@@ -27,10 +28,10 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double hiveX = 58;   // middle of the red hive
 
     private static final Pose startPose = pose(hiveX, 9, 90);
-    private static final Pose audienceShootPose = pose(hiveX, 14, 90);   // 5 in off the wall so the turn doesn't scrape
+    private static final Pose audienceShootPose = pose(hiveX, 14, 90);   // 5 in off the wall so it doesn't scrape
     private static final Pose rearShootPose = pose(hiveX, 116, -90);
 
-    private static final Pose gardenTurnSpot = pose(36, 30, -90);   // do the 180 out here, nowhere near a wall
+    private static final Pose gardenTurnSpot = new Pose(36, 30);   // spin around out here, nowhere near a wall
     private static final Pose gardenLineup = pose(15, 24, -90);   // a bit right of the pickup so it can't slide into the wall
     private static final Pose gardenPickup = pose(12, 12, -90);
     private static final Pose gardenBackup = pose(22, 24, -90);
@@ -67,6 +68,8 @@ public class PathDemoAllCombos extends LinearOpMode {
     private double lastStepTime = 0;
     private double worstLag = 0;
     private int timesStuck = 0;
+    private Pose lastTarget;
+    private String stopError = "-";
 
     @Override
     public void runOpMode() {
@@ -90,16 +93,14 @@ public class PathDemoAllCombos extends LinearOpMode {
 
         timer.reset();
         follower.setPose(mirrorIfBlue(startPose));
+        lastTarget = mirrorIfBlue(startPose);
 
         if (!runPlan()) logStep("Out of time");
         park();
         logStep("Park");
 
         status = "Parked";
-        while (opModeIsActive() && timer.seconds() < stopAt) {
-            follower.update();
-            updateTelemetry();
-        }
+        waitMs((long) Math.max(0, (stopAt - timer.seconds()) * 1000));
         follower.stop();
         follower.update();
     }
@@ -117,13 +118,13 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Rear flower", pickUp(rearFlowerLineup, rearFlowerPickup, rearFlowerLineup))) return false;
         } else {
             if (!step("Side flower", pickUp(sideFlowerLineup, sideFlowerPickup, sideFlowerLineup))) return false;
-            if (!step("Back to shoot", driveTo(audienceShootPose, 0, 0.6))) return false;
+            if (!step("Back to shoot", backToAudienceShot())) return false;
             if (!step("Shoot again", shoot())) return false;
             if (!step("Climb to rear flower", climbToRearFlower())) return false;
             if (!step("Rear flower", intakeAndBackUp(rearFlowerPickup, rearFlowerLineup))) return false;
         }
 
-        if (!step("Back to rear shot", driveTo(rearShootPose, 0, 0.6))) return false;
+        if (!step("Back to rear shot", backToRearShot())) return false;
         return step("Shoot flower balls", shoot());
     }
 
@@ -143,17 +144,33 @@ public class PathDemoAllCombos extends LinearOpMode {
         return waitMs(tipCheckMs);
     }
 
+    // drive over without turning, then spin to face it. turning on the way made it jerk
     private boolean pickUp(Pose lineup, Pose pickup, Pose backup) {
         status = "Lining up";
-        if (!driveTo(lineup, 0.3, 0.9)) return false;   // wait for the corners to clear the wall, done turning before we get there
+        if (!slideTo(lineup)) return false;
+        if (!turnTo(lineup.heading())) return false;
         return intakeAndBackUp(pickup, backup);
     }
 
     private boolean lineUpForGarden() {
-        status = "Turning for the garden";
-        if (!driveTo(gardenTurnSpot, 0.35, 0.9)) return false;   // go straight till the corners clear the start wall
+        status = "To the turn spot";
+        if (!slideTo(gardenTurnSpot)) return false;
+        status = "Turning around";
+        if (!turnTo(gardenLineup.heading())) return false;
         status = "Lining up";
-        return driveTo(gardenLineup, 0, 0.5);   // close to the wall here so any leftover turn happens early
+        return driveTo(gardenLineup);
+    }
+
+    private boolean backToAudienceShot() {
+        status = "Back to shoot";
+        if (!turnTo(audienceShootPose.heading())) return false;   // turn here, there's no room for it by the wall
+        return driveTo(audienceShootPose);
+    }
+
+    private boolean backToRearShot() {
+        status = "Back to the rear shot";
+        if (!slideTo(rearShootPose)) return false;
+        return turnTo(rearShootPose.heading());
     }
 
     private boolean intakeAndBackUp(Pose pickup, Pose backup) {
@@ -191,13 +208,40 @@ public class PathDemoAllCombos extends LinearOpMode {
         return driveTo(redTarget, 0, 1);
     }
 
+    // drives there still facing the same way
+    private boolean slideTo(Pose redTarget) {
+        return driveTo(redTarget.withHeading(mirrorIfBlue(follower.pose()).heading()));
+    }
+
+    // spins in place. a 180 aims 90 deg ccw first so it can't flip between left and right
+    private boolean turnTo(double redHeading) {
+        Pose spot = follower.pose();
+        double target = isBlue ? redHeading + Math.PI : redHeading;
+        if (Math.abs(angleTo(target, spot.heading())) > Math.toRadians(150)
+                && !spin(spot.withHeading(spot.heading() + Math.PI / 2), 30)) return false;
+        return spin(spot.withHeading(target), 4);
+    }
+
+    private boolean spin(Pose target, double closeEnoughDeg) {
+        lastTarget = target;
+        follower.hold(target);
+        ElapsedTime wait = new ElapsedTime();
+        while (opModeIsActive() && wait.seconds() < 1.5) {
+            if (outOfTime()) return false;
+            follower.update();
+            if (Math.abs(angleTo(target.heading(), follower.pose().heading())) < Math.toRadians(closeEnoughDeg)) return true;
+            updateTelemetry();
+        }
+        return opModeIsActive();
+    }
+
     // the turn happens between turnStart and turnEnd (fractions of the path)
     private boolean driveTo(Pose redTarget, double turnStart, double turnEnd) {
         Pose here = follower.pose();
         Pose target = mirrorIfBlue(redTarget);
 
         // a 180 can go either way depending on sensor noise, so those always go ccw through the halfway heading
-        double turn = Math.atan2(Math.sin(target.heading() - here.heading()), Math.cos(target.heading() - here.heading()));
+        double turn = angleTo(target.heading(), here.heading());
         if (turn < Math.toRadians(-170)) turn += 2 * Math.PI;
         double halfway = here.heading() + turn / 2;
 
@@ -214,6 +258,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private boolean follow(Path path) {
         follower.follow(path);
         Pose end = path.endPose();
+        lastTarget = end;
         double closest = Double.MAX_VALUE;
         ElapsedTime sinceCloser = new ElapsedTime();
         while (opModeIsActive()) {
@@ -253,18 +298,35 @@ public class PathDemoAllCombos extends LinearOpMode {
     // inches to go, plus 1 in for every ~6 deg of turning left
     private double distanceLeft(Pose end) {
         Pose p = follower.pose();
-        double turnLeft = Math.atan2(Math.sin(end.heading() - p.heading()), Math.cos(end.heading() - p.heading()));
-        return p.distance(end) + 10 * Math.abs(turnLeft);
+        return p.distance(end) + 10 * Math.abs(angleTo(end.heading(), p.heading()));
     }
 
-    // keeps updating pedro so it holds position, don't use sleep() here
+    // cuts the wheels and waits. still calls update() so the pinpoint keeps tracking
     private boolean waitMs(long ms) {
+        if (follower.holding() && !settle()) return false;
+        follower.stop();
         ElapsedTime wait = new ElapsedTime();
         while (opModeIsActive() && wait.milliseconds() < ms) {
             if (outOfTime()) return false;
             follower.update();
             updateTelemetry();
         }
+        return opModeIsActive();
+    }
+
+    // pedro ends paths a little early, so hold till it actually stops or it coasts past
+    private boolean settle() {
+        ElapsedTime wait = new ElapsedTime();
+        while (opModeIsActive() && wait.seconds() < 1) {
+            if (outOfTime()) return false;
+            follower.update();
+            Velocity v = follower.velocity();
+            boolean stopped = Math.hypot(v.vx, v.vy) < 2 && Math.abs(v.omega) < 0.2;
+            if (stopped && (distanceLeft(lastTarget) < 1.5 || wait.seconds() > 0.4)) break;
+            updateTelemetry();
+        }
+        Pose p = follower.pose();
+        stopError = String.format("%.1f in, %.0f deg", p.distance(lastTarget), Math.abs(Math.toDegrees(angleTo(lastTarget.heading(), p.heading()))));
         return opModeIsActive();
     }
 
@@ -311,6 +373,9 @@ public class PathDemoAllCombos extends LinearOpMode {
         telemetry.addData("Plan", "%s, %s", isBlue ? "Blue" : "Red", hiveTipped ? "tipped" : "not tipped");
         telemetry.addData("Pose", "(%.1f, %.1f) %.0f deg", p.x(), p.y(), normalizeDeg(Math.toDegrees(p.heading())));
         telemetry.addData("Balls", balls);
+        telemetry.addData("Last stop off by", stopError);   // what pedro thinks. if it looks way more off, it's the pinpoint or the start spot
+        Object volts = follower.debug().drivetrain().get("voltage");
+        if (volts instanceof Double) telemetry.addData("Battery", "%.1f V", (Double) volts);
         telemetry.addData("Time", "%.1f s, park needs ~%.1f s", timer.seconds(), timeToPark());
         for (String line : stepLog) telemetry.addLine(line);
         telemetry.update();
@@ -318,6 +383,11 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private static Pose pose(double x, double y, double headingDeg) {
         return new Pose(x, y, Math.toRadians(headingDeg));
+    }
+
+    // shortest turn from current to target, -pi to pi
+    private static double angleTo(double target, double current) {
+        return Math.atan2(Math.sin(target - current), Math.cos(target - current));
     }
 
     private static double normalizeDeg(double deg) {

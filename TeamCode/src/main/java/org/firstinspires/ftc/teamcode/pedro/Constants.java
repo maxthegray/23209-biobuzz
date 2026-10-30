@@ -6,7 +6,6 @@ import com.pedropathing.controllers.Controller;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Matrix;
 import com.pedropathing.math.Vector2D;
-import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.drivetrains.MecanumConfig;
 import com.pedropathing.revhub.localizers.PinpointConfig;
 import com.pedropathing.revhub.localizers.PinpointLocalizer;
@@ -62,8 +61,6 @@ public class Constants {
                 Controller secondaryTranslationalForward = Controller.proportional(0.14259101231523041);
                 Controller primaryTranslationalLateral = Controller.proportional(0.649893858954874);
                 Controller secondaryTranslationalLateral = Controller.proportional(0.24011841540008994);
-                Controller primaryHeading = Controller.proportional(7.0912011875081555);
-                Controller secondaryHeading = Controller.proportional(3.0);   // anything stronger jittered at rest
 
                 c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
                 c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
@@ -71,9 +68,10 @@ public class Constants {
                 c.coast.set(Controller.proportionalFeedforward(0.008317315818631975));
                 c.brake.set(Controller.proportionalFeedforward(0.007069718445837179));
 
-                // gentle when within 5 deg so it doesn't jitter, full autotune strength for real turns
-                c.headingFeedback.set(Controller.piecewise(secondaryHeading).put(Math.toRadians(5), primaryHeading));
-                c.cosineScale.set(true);   // stops driving forward when the heading falls way behind so the turn can catch up
+                // plain autotune again, the 5 deg split made it jump between strengths mid turn
+                c.headingFeedback.set(Controller.proportional(7.0912011875081555));
+                c.cosineScale.set(false);   // on made it stop and go whenever a turn fell behind
+                c.maxBrakingPower.set(0.4);   // default 0.2 let it slide past spots
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(0.10744791340779461, 0.006264631361127194));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.18552051491361324, 0.10012107419859242));
@@ -89,7 +87,7 @@ public class Constants {
     public static Follower create(HardwareMap h) {
         return new Follower(
                 new PinpointLocalizer(h, localizerConfig),
-                new Mecanum(h, drivetrainConfig),
+                new VoltageMecanum(h, drivetrainConfig),
                 new Foresight(foresightConfig)
         );
     }
