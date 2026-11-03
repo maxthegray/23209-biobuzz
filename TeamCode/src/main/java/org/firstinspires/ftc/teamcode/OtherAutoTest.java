@@ -1,4 +1,5 @@
 package org.firstinspires.ftc.teamcode;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.pedropathing.follower.Follower;
@@ -15,7 +16,7 @@ import com.pedropathing.ivy.Command;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 
 
-
+@Disabled
 @Autonomous(name = "Other Auto Test", group="testing")
 public class OtherAutoTest extends OpMode {
     private Follower follower;

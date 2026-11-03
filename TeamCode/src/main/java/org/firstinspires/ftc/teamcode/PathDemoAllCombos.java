@@ -14,6 +14,7 @@ import com.pedropathing.paths.interpolator.PiecewiseInterpolator;
 import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -28,6 +29,8 @@ import java.util.List;
 
 // all 4 autos (red/blue, tipped/not tipped). no shooter or intake yet so those are just waits
 // poses are red side in pedro visualizer coords, blue gets mirrored
+
+@Disabled
 @Autonomous(name = "Path Demo (all combos)", group = "teaching")
 public class PathDemoAllCombos extends LinearOpMode {
 

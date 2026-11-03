@@ -21,6 +21,17 @@ android {
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
+
+    // Disable pedro stuff (temporarily)
+    sourceSets {
+        main {
+            java {
+                exclude '**/teamcode/PathDemoAllCombos.java'
+                exclude '**/teamcode/AutoTestingPedro.java'
+                exclude '**/teamcode/OtherAutoTest.java'
+            }
+        }
+    }
 }
 
 dependencies {
