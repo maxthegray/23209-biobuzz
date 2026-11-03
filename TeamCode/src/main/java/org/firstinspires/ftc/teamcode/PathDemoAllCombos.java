@@ -3,15 +3,22 @@ package org.firstinspires.ftc.teamcode;
 import static com.pedropathing.api.Paths.curve;
 import static com.pedropathing.api.Paths.line;
 
+import com.pedropathing.algorithm.Foresight;
+import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
 import com.pedropathing.paths.Path;
 import com.pedropathing.paths.interpolator.Interpolator;
 import com.pedropathing.paths.interpolator.PiecewiseInterpolator;
+import com.pedropathing.revhub.drivetrains.Mecanum;
+import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
@@ -57,7 +64,11 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final long tipCheckMs = 1100;
     private static final int maxBalls = 4;
 
+    private static final double nominalVoltage = 12.0;   // every path drives like it's on a 12 V battery
+    private static final double lowBattery = 12.5;   // resting voltage under this, swap it before the run
+
     private Follower follower;
+    private BatteryDrive drive;
     private final ElapsedTime timer = new ElapsedTime();
     private boolean isBlue = false;
     private boolean hiveTipped = true;
@@ -73,7 +84,9 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     @Override
     public void runOpMode() {
-        follower = Constants.create(hardwareMap);
+        // same as Constants.create() but with the battery scaled drive, so it covers every path, spin and hold
+        drive = new BatteryDrive(hardwareMap);
+        follower = new Follower(new PinpointLocalizer(hardwareMap, Constants.localizerConfig), drive, new Foresight(Constants.foresightConfig));
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         while (opModeInInit()) {
@@ -87,6 +100,8 @@ public class PathDemoAllCombos extends LinearOpMode {
             telemetry.addLine("Dpad left/right = alliance, up/down = tipped");
             telemetry.addLine(isBlue ? "Back against the rear wall, centered on the blue hive"
                     : "Back against the audience wall, centered on the red hive");
+            drive.readBattery();
+            telemetry.addData("Battery", "%.1f V%s", drive.voltage, drive.voltage < lowBattery ? "  LOW, swap it" : "");
             telemetry.update();
         }
         if (isStopRequested()) return;
@@ -309,6 +324,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         while (opModeIsActive() && wait.milliseconds() < ms) {
             if (outOfTime()) return false;
             follower.update();
+            drive.readBattery();   // wheels are off so drive() isn't running, keep the number fresh anyway
             updateTelemetry();
         }
         return opModeIsActive();
@@ -342,7 +358,8 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private double timeToPark() {
         Pose here = mirrorIfBlue(follower.pose());
-        return Math.hypot(here.x() - parkPose.x(), here.y() - parkPose.y()) / avgSpeed + parkBuffer;
+        double speed = avgSpeed * Math.min(1, drive.voltage / nominalVoltage);   // a tired battery can't hit full speed even with the boost
+        return Math.hypot(here.x() - parkPose.x(), here.y() - parkPose.y()) / speed + parkBuffer;
     }
 
     private boolean step(String name, boolean done) {
@@ -374,8 +391,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         telemetry.addData("Pose", "(%.1f, %.1f) %.0f deg", p.x(), p.y(), normalizeDeg(Math.toDegrees(p.heading())));
         telemetry.addData("Balls", balls);
         telemetry.addData("Last stop off by", stopError);   // what pedro thinks. if it looks way more off, it's the pinpoint or the start spot
-        Object volts = follower.debug().drivetrain().get("voltage");
-        if (volts instanceof Double) telemetry.addData("Battery", "%.1f V", (Double) volts);
+        telemetry.addData("Battery", "%.1f V, power x%.2f", drive.voltage, drive.scale());
         telemetry.addData("Time", "%.1f s, park needs ~%.1f s", timer.seconds(), timeToPark());
         for (String line : stepLog) telemetry.addLine(line);
         telemetry.update();
@@ -394,5 +410,39 @@ public class PathDemoAllCombos extends LinearOpMode {
         while (deg > 180) deg -= 360;
         while (deg <= -180) deg += 360;
         return deg;
+    }
+
+    // pedro's mecanum but every drive command gets scaled by battery voltage, so a fresh battery and a tired one drive the same
+    private static class BatteryDrive extends Mecanum {
+        private final VoltageSensor battery;
+        private final ElapsedTime sinceRead = new ElapsedTime();
+        double voltage;
+
+        BatteryDrive(HardwareMap hardwareMap) {
+            super(hardwareMap, Constants.drivetrainConfig);
+            battery = hardwareMap.voltageSensor.iterator().next();
+            voltage = battery.getVoltage();
+            if (voltage < 6) voltage = nominalVoltage;
+        }
+
+        @Override
+        public void drive(DrivePowers powers, boolean manual) {
+            readBattery();
+            double s = scale();
+            super.drive(new DrivePowers(powers.forward() * s, powers.strafe() * s, powers.turn() * s), manual);
+        }
+
+        // the reading jumps around under load, so only read every 100 ms and smooth it
+        void readBattery() {
+            if (sinceRead.milliseconds() < 100) return;
+            sinceRead.reset();
+            double reading = battery.getVoltage();
+            if (reading > 6) voltage += 0.2 * (reading - voltage);   // under 6 is a bad read, skip it
+        }
+
+        // capped so a bad battery can't make it go nuts either way
+        double scale() {
+            return Range.clip(nominalVoltage / voltage, 0.75, 1.15);
+        }
     }
 }
