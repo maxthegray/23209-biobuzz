@@ -45,7 +45,8 @@ public class Constants {
     public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
         c.name.set("pinpoint");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
-        c.xPodOffset.set(-3.220380347544753);
+        // Old bad value: -3.220380347544753
+        c.xPodOffset.set(-2.81496062992);
         c.yPodOffset.set(0.0);
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
@@ -57,30 +58,27 @@ public class Constants {
     // step 3: ForesightTuner results (tuned on our sensor bot 2026-10-21). rerun it if the drivetrain changes
     public static ForesightConfig foresightConfig = new ForesightConfig(
             c -> {
-                Controller primaryTranslationalForward = Controller.proportional(0.3859305130404934);
-                Controller secondaryTranslationalForward = Controller.proportional(0.14259101231523041);
-                Controller primaryTranslationalLateral = Controller.proportional(0.649893858954874);
-                Controller secondaryTranslationalLateral = Controller.proportional(0.24011841540008994);
+                Controller primaryTranslationalForward = Controller.proportional(0.3597373564612878);
+                Controller secondaryTranslationalForward = Controller.proportional(0.13291334085324785);
+                Controller primaryTranslationalLateral = Controller.proportional(0.5502504565055769);
+                Controller secondaryTranslationalLateral = Controller.proportional(0.2033028407158245);
 
                 c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
                 c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
 
-                c.coast.set(Controller.proportionalFeedforward(0.008317315818631975));
-                c.brake.set(Controller.proportionalFeedforward(0.007069718445837179));
+                c.coast.set(Controller.proportionalFeedforward(0.007815890238465663));
+                c.brake.set(Controller.proportionalFeedforward(0.006643506702695813));
 
-                // plain autotune again, the 5 deg split made it jump between strengths mid turn
-                c.headingFeedback.set(Controller.proportional(7.0912011875081555));
-                c.cosineScale.set(false);   // on made it stop and go whenever a turn fell behind
-                c.maxBrakingPower.set(0.4);   // default 0.2 let it slide past spots
-                c.headingBrakeCoefficients.set(Vector2D.cartesian(0.10744791340779461, 0.006264631361127194));
+                c.headingFeedback.set(Controller.proportional(6.850489029145952));
+                c.headingBrakeCoefficients.set(Vector2D.cartesian(0.104897891962599, 0.0053908964799081385));
 
-                c.linearBrakeCoefficients.set(Matrix.diag(0.18552051491361324, 0.10012107419859242));
-                c.quadraticBrakeCoefficients.set(Matrix.diag(0.002071194869299692, 0.0022879444427973015));
+                c.linearBrakeCoefficients.set(Matrix.diag(0.21298353512080692, 0.11080383152120533));
+                c.quadraticBrakeCoefficients.set(Matrix.diag(0.0018440578423433744, 0.0020768012656047856));
 
-                c.maxAchievableForwardVelocity.set(68.3251044222146);
-                c.maxAchievableStrafeVelocity.set(61.181111299438065);
-                c.naturalForwardDeceleration.set(41.270915401949004);
-                c.naturalStrafeDeceleration.set(64.36119081305444);
+                c.maxAchievableForwardVelocity.set(78.75846835654511);
+                c.maxAchievableStrafeVelocity.set(71.43099689300077);
+                c.naturalForwardDeceleration.set(40.49524293548839);
+                c.naturalStrafeDeceleration.set(63.69204320827517);
             }
     );
 
