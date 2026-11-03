@@ -14,5 +14,8 @@ dependencies {
     implementation 'org.firstinspires.ftc:FtcCommon:11.2.0'
     implementation 'org.firstinspires.ftc:Vision:11.2.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
+    // PEDROPATHING INSTALL
+    implementation 'com.pedropathing:revhub:3.0.2'
+    implementation 'com.pedropathing:tuning:1.0.0'
 }
 
