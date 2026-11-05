@@ -26,7 +26,7 @@ android {
     sourceSets {
         main {
             java {
-                exclude '**/teamcode/PathDemoAllCombos.java'
+//                exclude '**/teamcode/PathDemoAllCombos.java'
                 exclude '**/teamcode/AutoTestingPedro.java'
                 exclude '**/teamcode/OtherAutoTest.java'
                 exclude '**/teamcode/RedTippedExport.java'
