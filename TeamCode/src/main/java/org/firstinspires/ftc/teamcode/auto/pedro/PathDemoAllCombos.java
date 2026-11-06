@@ -22,6 +22,7 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,8 +70,17 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double nominalVoltage = 12.0;   // every path drives like it's on a 12 V battery
     private static final double lowBattery = 12.5;   // resting voltage under this, swap it before the run
 
+    private static final double bumperToCenter = 9.0;   // half the robot length, measure it
+    private static final boolean fixPoseAtWall = false;   // true = let the wall reading correct pedro's position after the adjust
+    private static final double maxPoseFix = 4.0;   // ultrasonics disagree with pedro by more than this = don't trust them
+    private static final double maxAdjust = 3.0;   // the adjust can't take it further than this from pedro's pickup spot
+
     private Follower follower;
     private BatteryDrive drive;
+    private FlowerApproachTest.WallApproach sonar;
+    private boolean approaching = false;
+    private String sonarResult = "-";
+    private String stepNote = "";
     private final ElapsedTime timer = new ElapsedTime();
     private boolean isBlue = false;
     private boolean hiveTipped = true;
@@ -89,6 +99,11 @@ public class PathDemoAllCombos extends LinearOpMode {
         // same as Constants.create() but with the battery scaled drive, so it covers every path, spin and hold
         drive = new BatteryDrive(hardwareMap);
         follower = new Follower(new PinpointLocalizer(hardwareMap, Constants.localizerConfig), drive, new Foresight(Constants.foresightConfig));
+        try {
+            sonar = new FlowerApproachTest.WallApproach(hardwareMap);
+        } catch (IllegalArgumentException e) {
+            sonar = null;   // not in the robot config, flowers just use pedro
+        }
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         while (opModeInInit()) {
@@ -104,6 +119,8 @@ public class PathDemoAllCombos extends LinearOpMode {
                     : "Back against the audience wall, centered on the red hive");
             drive.readBattery();
             telemetry.addData("Battery", "%.1f V%s", drive.voltage, drive.voltage < lowBattery ? "  LOW, swap it" : "");
+            if (sonar != null) sonar.showReadings(telemetry);
+            else telemetry.addLine("Ultrasonics not in the config, flowers use pedro only");
             telemetry.update();
         }
         if (isStopRequested()) return;
@@ -132,13 +149,13 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Garden", intakeAndBackUp(gardenPickup, gardenBackup))) return false;
             if (!step("Swoop to rear", swoopToRearShoot())) return false;
             if (!step("Shoot garden balls", shoot())) return false;
-            if (!step("Rear flower", pickUp(rearFlowerLineup, rearFlowerPickup, rearFlowerLineup))) return false;
+            if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, rearFlowerLineup))) return false;
         } else {
-            if (!step("Side flower", pickUp(sideFlowerLineup, sideFlowerPickup, sideFlowerLineup))) return false;
+            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, sideFlowerLineup))) return false;
             if (!step("Back to shoot", backToAudienceShot())) return false;
             if (!step("Shoot again", shoot())) return false;
             if (!step("Climb to rear flower", climbToRearFlower())) return false;
-            if (!step("Rear flower", intakeAndBackUp(rearFlowerPickup, rearFlowerLineup))) return false;
+            if (!step("Rear flower", intakeFromFlower(rearFlowerPickup, rearFlowerLineup))) return false;
         }
 
         if (!step("Back to rear shot", backToRearShot())) return false;
@@ -162,11 +179,84 @@ public class PathDemoAllCombos extends LinearOpMode {
     }
 
     // drive over without turning, then spin to face it. turning on the way made it jerk
-    private boolean pickUp(Pose lineup, Pose pickup, Pose backup) {
+    private boolean pickUpFlower(Pose lineup, Pose pickup, Pose backup) {
         status = "Lining up";
         if (!slideTo(lineup)) return false;
         if (!turnTo(lineup.heading())) return false;
-        return intakeAndBackUp(pickup, backup);
+        return intakeFromFlower(pickup, backup);
+    }
+
+    // pedro drives in like normal, then the ultrasonics adjust. if they give up it just stays where pedro put it
+    private boolean intakeFromFlower(Pose pickup, Pose backup) {
+        status = "Driving in";
+        if (!driveTo(pickup)) return false;
+        if (!adjustAtFlower(pickup)) return false;
+        status = "Intaking (simulated)";
+        if (!waitMs(intakeMs)) return false;
+        balls = maxBalls;
+        status = "Backing up";
+        return driveTo(backup);
+    }
+
+    // squares up so both sensors read the same, then creeps to the stop distance. false = out of time
+    private boolean adjustAtFlower(Pose redPickup) {
+        if (sonar == null) {
+            sonarResult = "no sensors, pedro only";
+            stepNote = " pedro";
+            return true;
+        }
+        if (follower.holding() && !settle()) return false;   // pedro's path ends with it still rolling, stop first
+        Pose pickup = mirrorIfBlue(redPickup);
+        status = "Ultrasonic adjust";
+        approaching = true;
+        sonar.start();
+        FlowerApproachTest.WallApproach.Result result = FlowerApproachTest.WallApproach.Result.RUNNING;
+        boolean wandered = false;
+        while (opModeIsActive() && result == FlowerApproachTest.WallApproach.Result.RUNNING && !outOfTime()) {
+            result = sonar.update(follower, leftOf(pickup));
+            follower.update();
+            wandered = follower.pose().distance(pickup) > maxAdjust;   // bad readings would drive it off somewhere, pedro is the boss
+            if (wandered) break;
+            updateTelemetry();
+        }
+        approaching = false;
+        if (result == FlowerApproachTest.WallApproach.Result.DONE) {
+            stepNote = " sonar";
+            fixPoseFromWall();
+            return true;
+        }
+        follower.manual(0, 0, 0);
+        sonarResult = wandered ? "wanted to go too far, back to pedro's spot" : "failed, back to pedro's spot";
+        stepNote = " sonar failed";
+        if (follower.pose().distance(pickup) > 1) return driveTo(redPickup);
+        return opModeIsActive() && !outOfTime();
+    }
+
+    // how far the pickup spot is to the robot's left. comes from pedro since the ultrasonics only see ahead
+    private double leftOf(Pose spot) {
+        Pose p = follower.pose();
+        double dx = spot.x() - p.x(), dy = spot.y() - p.y();
+        return -Math.sin(p.heading()) * dx + Math.cos(p.heading()) * dy;
+    }
+
+    // the wall doesn't move, so trust the ultrasonics over the pinpoint for how far we are from it
+    private void fixPoseFromWall() {
+        Pose p = follower.pose();
+        double fromWall = sonar.bumperToWall() + bumperToCenter;
+        double c = Math.cos(p.heading()), s = Math.sin(p.heading());
+        Pose fixed;
+        if (Math.abs(c) > Math.abs(s)) fixed = p.withX(c > 0 ? fieldSize - fromWall : fromWall);
+        else fixed = p.withY(s > 0 ? fieldSize - fromWall : fromWall);
+
+        double off = fixed.distance(p);
+        if (!fixPoseAtWall) {
+            sonarResult = String.format("done, pedro was off %.1f in (not fixed)", off);
+        } else if (off > maxPoseFix) {
+            sonarResult = String.format("done, but pedro was off %.1f in so left it", off);
+        } else {
+            follower.setPose(fixed);
+            sonarResult = String.format("done, fixed pedro by %.1f in", off);
+        }
     }
 
     private boolean lineUpForGarden() {
@@ -183,6 +273,18 @@ public class PathDemoAllCombos extends LinearOpMode {
         if (!turnTo(audienceShootPose.heading())) return false;   // turn here, there's no room for it by the wall
         return driveTo(audienceShootPose);
     }
+    // private boolean backToAudienceShot() {
+    //   status = "Back to rear shotting";
+    //   if (!turnTo(audienceShootPose.heading())) return false;
+    //   return driveTo(audienceShootPose);
+    //   return driveTo(audienceShootPose);
+    //   if (!turnTo(gardenLineup.heading())) return false;
+    //   status = "returned to back";
+    //   return driveTo != averageOfPos * x + averageOfPos * y + averageOfPos* z
+    //   stableAverage = (!driveTo * x) + (averageOfPos * y) + (averageOfPos * z)
+    //   stableAverage2 = (!driveTo * x) + (averageOfPos* y) + (averageOfPos * z)
+    //   stableAverage3 =
+    // }
 
     private boolean backToRearShot() {
         status = "Back to the rear shot";
@@ -373,7 +475,9 @@ public class PathDemoAllCombos extends LinearOpMode {
         double now = timer.seconds();
         // lag = most the heading fell behind the path during that step, stuck = how many times it had to get unstuck
         String line = String.format("%-20s %4.1f s (at %4.1f) lag %3.0f", name, now - lastStepTime, now, worstLag);
-        stepLog.add(timesStuck > 0 ? line + " stuck " + timesStuck : line);
+        if (timesStuck > 0) line += " stuck " + timesStuck;
+        stepLog.add(line + stepNote);
+        stepNote = "";
         lastStepTime = now;
         worstLag = 0;
         timesStuck = 0;
@@ -394,6 +498,8 @@ public class PathDemoAllCombos extends LinearOpMode {
         telemetry.addData("Balls", balls);
         telemetry.addData("Last stop off by", stopError);   // what pedro thinks. if it looks way more off, it's the pinpoint or the start spot
         telemetry.addData("Battery", "%.1f V, power x%.2f", drive.voltage, drive.scale());
+        telemetry.addData("Flower approach", sonarResult);
+        if (approaching) sonar.addTelemetry(telemetry);
         telemetry.addData("Time", "%.1f s, park needs ~%.1f s", timer.seconds(), timeToPark());
         for (String line : stepLog) telemetry.addLine(line);
         telemetry.update();
