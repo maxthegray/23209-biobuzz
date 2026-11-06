@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.AnalogInput;
 
 import java.util.Arrays;
 
-@TeleOp(name = "Drive to Wall w/ Ultrasonic", group = "Sensor")
+// @TeleOp(name = "Drive to Wall w/ Ultrasonic", group = "Sensor")   // turn back on once this extends LinearOpMode, the driver hub errors on it till then
 public class DriveStraightUltrasonic {
     private static final String LEFT_SIGNAL = "ultrasonic_left_signal";
     private static final String LEFT_VCC = "ultrasonic_left_vcc";

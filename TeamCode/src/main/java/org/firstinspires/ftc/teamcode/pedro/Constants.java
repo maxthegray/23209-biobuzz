@@ -53,6 +53,7 @@ public class Constants {
                 c.brake.set(Controller.proportionalFeedforward(0.00660799928625429));
 
                 c.headingFeedback.set(Controller.proportional(6.760110883968154));
+                c.maxBrakingPower.set(0.4);   // not from autotune. default 0.2 let it slide past spots
                 c.headingBrakeCoefficients.set(Vector2D.cartesian(0.11055094467026527, 0.0049049414706489845));
 
                 c.linearBrakeCoefficients.set(Matrix.diag(0.19836083101102445, 0.12202614310476821));
