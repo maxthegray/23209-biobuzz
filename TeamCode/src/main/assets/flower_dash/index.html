@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flower Approach Dashboard</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#1a1d23;--mute:#667085;--line:#e1e4ea;
+  --left:#2563eb;--right:#e8710a;--good:#15803d;--bad:#c62828;--warn:#b7791f;--accent:#2563eb;--band:rgba(120,120,120,.13);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14161a;--card:#1d2026;--ink:#eceef2;--mute:#9aa3b2;--line:#2c3038;
+  --left:#6aa3ff;--right:#ffa04d;--good:#4ade80;--bad:#ff6b6b;--warn:#f5c15b;--accent:#6aa3ff;--band:rgba(200,200,200,.12);}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0;flex:1 1 auto}
+.pill{padding:3px 10px;border-radius:99px;font-size:13px;border:1px solid var(--line);color:var(--mute)}
+.pill.ok{color:var(--good);border-color:var(--good)}.pill.err{color:var(--bad);border-color:var(--bad)}
+#banner{display:none;background:var(--bad);color:#fff;padding:8px 16px;font-weight:600}
+#toast{min-height:22px;padding:6px 16px;color:var(--warn);font-weight:600}
+main{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card.active{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.card.dim{opacity:.55}
+h2{font-size:15px;margin:0 0 8px}
+.num{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;text-align:center;font-size:13px;line-height:22px;margin-right:6px}
+p{margin:6px 0}.mute{color:var(--mute);font-size:13px}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+button.big{padding:16px 20px;font-size:17px;width:100%}
+button.danger{background:var(--bad);color:#fff;border-color:var(--bad);font-weight:700}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+input[type=text],input[type=number]{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:110px}
+input.wide{width:100%}
+label{display:block;font-size:13px;color:var(--mute);margin-top:6px}
+.live{display:flex;gap:18px;font-variant-numeric:tabular-nums;font-size:20px;margin:6px 0}
+.live b{font-size:12px;display:block;font-weight:500}
+.l{color:var(--left)}.r{color:var(--right)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}
+tr.cur td{background:var(--band)}
+.verdict{padding:4px 0}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin:6px 0;font-size:13px;overflow:auto}
+.chart{position:relative}
+canvas{width:100%;height:280px;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:3px 7px;border-radius:5px;display:none;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--mute);margin:4px 0}
+.legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:4px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Flower approach: ultrasonic calibration</h1>
+  <span class="pill" id="conn">connecting...</span>
+  <span class="pill" id="started">Driver Hub: INIT</span>
+  <span class="pill" id="samples">0 samples</span>
+</header>
+<div id="banner">Robot unreachable, retrying. Your data is kept on this page and on the robot.</div>
+<div id="toast"></div>
+
+<main>
+<section id="wizard">
+  <div class="card" id="c0">
+    <h2><span class="num">0</span>Measure the robot</h2>
+    <p><b>Sensor spacing</b>: center of the left sensor's round face to the center of the right one.</p>
+    <p><b>Sensor setback</b>: how far the sensor faces sit <i>behind</i> the front of the bumper (0 if they're flush).</p>
+    <p class="mute">Hold the tape square and level, measure in inches. Used for the crookedness angle and for "bumper distance".</p>
+    <div class="row">
+      <div><label for="spacing">Spacing (in)</label><input id="spacing" type="number" step="0.05" min="1" max="40"></div>
+      <div><label for="setback">Setback (in)</label><input id="setback" type="number" step="0.05" min="0" max="20"></div>
+      <div style="align-self:end"><button id="sendGeo">Send to robot</button></div>
+    </div>
+    <div class="live"><div class="l"><b>left now</b><span id="l0">-</span></div><div class="r"><b>right now</b><span id="r0">-</span></div><div><b>supply</b><span id="v0">-</span></div></div>
+    <div id="sensorOk" class="mute"></div>
+  </div>
+
+  <div class="card" id="c1">
+    <h2><span class="num">1</span>Formula check <span class="mute" id="stepOf"></span></h2>
+    <p id="instr">Waiting for the robot...</p>
+    <div class="live"><div class="l"><b>left</b><span id="l1">-</span></div><div class="r"><b>right</b><span id="r1">-</span></div></div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="mute" id="phaseTxt"></div>
+    <div class="row">
+      <button class="primary big" id="rec">Record this distance</button>
+    </div>
+    <div class="row">
+      <button id="cancel">Cancel</button>
+      <button id="redo">Back one step</button>
+      <button id="done">Done, show results</button>
+      <button id="restart">Start over</button>
+    </div>
+    <table id="stepTable"><thead><tr><th>tape</th><th>left</th><th>right</th><th>wobble L/R</th></tr></thead><tbody></tbody></table>
+    <label for="tapes">Distances to test (in), comma separated</label>
+    <div class="row"><input class="wide" style="flex:1" id="tapes" type="text"><button id="setTapes">Apply</button></div>
+    <div id="wobbleWarn" class="verdict warn"></div>
+  </div>
+
+  <div class="card" id="c2">
+    <h2><span class="num">2</span>Results</h2>
+    <div id="verdicts"></div>
+    <div id="paste"></div>
+    <div class="row">
+      <button class="primary" id="goFix">Drive check WITH fix</button>
+      <button id="goNoFix">Drive check, no fix</button>
+      <button id="restart2">Redo formula check</button>
+    </div>
+  </div>
+
+  <div class="card" id="c3">
+    <h2><span class="num">3</span>Drive check</h2>
+    <p>Aim at the object from 1-2 ft. <b>Hold the button</b> to drive; let go (or lose Wi-Fi) and it stops. Needs START pressed on the Driver Hub.</p>
+    <p class="mute" id="stopAt"></p>
+    <div class="row"><button class="primary big" id="hold">HOLD TO DRIVE</button></div>
+    <div class="row"><button class="danger" id="estop">STOP</button><button id="reset">Reset stop</button><button id="back">Back to results</button></div>
+    <div class="live"><div class="l"><b>left</b><span id="l3">-</span></div><div class="r"><b>right</b><span id="r3">-</span></div><div><b>to go</b><span id="togo">-</span></div><div><b>angle</b><span id="ang">-</span></div></div>
+    <div class="mute" id="driveInfo"></div>
+    <label for="measured">After it stops: tape-measured bumper to object (in)</label>
+    <div class="row"><input id="measured" type="number" step="0.05"><button id="logTrial">Log trial</button></div>
+    <table id="trialTable"><thead><tr><th>#</th><th>robot thinks</th><th>tape</th><th>error</th><th>result</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Download</h2>
+    <div class="row">
+      <button id="dlRaw">Raw CSV</button><button id="dlSum">Summary CSV</button><button id="dlFit">Fit CSV</button><button id="dlTrials">Trials CSV</button><button id="dlAll" class="primary">All files</button>
+    </div>
+    <p class="mute">Made from this page's copy of the data, so it works even after the opmode ends. The robot also saves them in /sdcard/FIRST/flower_cal/.</p>
+  </div>
+</section>
+
+<section id="graphs">
+  <div class="card">
+    <h2>Readings over time</h2>
+    <div class="tools">
+      <button data-win="30">30 s</button><button data-win="120">2 min</button><button data-win="0">All</button>
+      <button id="pause">Pause</button>
+    </div>
+    <div class="legend"><span><i style="background:var(--left)"></i>left</span><span><i style="background:var(--right)"></i>right</span><span><i style="background:var(--mute)"></i>tape target (dashed)</span><span>shaded = settling / recording</span></div>
+    <div class="chart"><canvas id="chA"></canvas><div class="tip"></div></div>
+  </div>
+  <div class="card">
+    <h2>Reading vs tape, best line of fit</h2>
+    <div class="legend" id="legB"></div>
+    <div class="chart"><canvas id="chB"></canvas><div class="tip"></div></div>
+    <p class="mute">Dashed grey line = perfect sensor. Each coloured line is the least-squares fit: tape = scale &times; reading + offset.</p>
+  </div>
+  <div class="card">
+    <h2>Misses (inches off the tape)</h2>
+    <div class="legend"><span><i style="background:var(--left)"></i>left</span><span><i style="background:var(--right)"></i>right</span><span>filled = before fix, hollow = after fix, band = good enough</span></div>
+    <div class="chart"><canvas id="chC"></canvas><div class="tip"></div></div>
+  </div>
+</section>
+</main>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const PHASES=["IDLE","SETTLING","RECORDING","DRIVE"];
+let S=null;                 // latest state from the robot
+let samples=[];             // [idx,t,step,attempt,phase,counted,corrected,tape,l,r,v]
+let sessionId=null, nextIndex=0, connected=false, lastOk=0, windowSec=30, paused=false, geoInit=false, tapesInit="";
+let hover={};
+
+// ---------- save a copy in this browser ----------
+function saveLocal(){
+  try{localStorage.setItem("flowerDash",JSON.stringify({sessionId,nextIndex,samples:samples.slice(-30000),S}))}catch(e){}
+}
+function loadLocal(){
+  try{const d=JSON.parse(localStorage.getItem("flowerDash")||"null");
+    if(d){sessionId=d.sessionId;nextIndex=d.nextIndex;samples=d.samples||[];S=d.S;
+      // samples were trimmed, so ask the robot for everything again only if we lost the start
+      if(samples.length&&samples[0][0]>0){nextIndex=0;samples=[];}}}catch(e){}
+}
+setInterval(saveLocal,3000);
+
+// ---------- talking to the robot ----------
+async function post(cmd,args){
+  try{
+    const r=await fetch("/api/cmd",{method:"POST",body:JSON.stringify(Object.assign({cmd},args||{})),headers:{"Content-Type":"application/json"}});
+    const j=await r.json();
+    if(!j.ok)toast(j.reason);else toast("");
+    return j.ok;
+  }catch(e){toast("Couldn't reach the robot");return false}
+}
+function toast(t){$("toast").textContent=t||""}
+
+async function poll(){
+  try{
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),1500);
+    const r=await fetch("/api/state?since="+nextIndex,{signal:ctl.signal,cache:"no-store"});
+    clearTimeout(to);
+    const j=await r.json();
+    if(sessionId!==j.sessionId){sessionId=j.sessionId;samples=[];nextIndex=0;if(j.samples.length===0&&j.nextIndex>0){setTimeout(poll,0);return}}
+    for(const s of j.samples)samples.push(s);
+    nextIndex=j.nextIndex;S=j;connected=true;lastOk=Date.now();
+    render();
+  }catch(e){connected=false}
+  $("banner").style.display=connected?"none":"block";
+  $("conn").textContent=connected?"connected":"offline";
+  $("conn").className="pill "+(connected?"ok":"err");
+  setTimeout(poll,connected?200:1000);
+}
+
+// ---------- fitting (same math as the robot's Fit.of) ----------
+function fitOf(pairs){ // pairs of [reading,tape]
+  const n=pairs.length;let sr=0,st=0,srr=0,srt=0;
+  for(const [r,t] of pairs){sr+=r;st+=t;srr+=r*r;srt+=r*t}
+  let scale=1,offset=0;
+  if(n>=2&&n*srr-sr*sr!==0){scale=(n*srt-sr*st)/(n*srr-sr*sr);offset=(st-scale*sr)/n}
+  return{n,scale,offset};
+}
+function recordedSteps(){return S?S.steps.filter(s=>s.recorded):[]}
+
+// ---------- rendering the wizard ----------
+const f2=(x,d=2)=>x==null?"-":x.toFixed(d);
+function render(){
+  if(!S)return;
+  const stg=S.stage, c=S.config, idle=S.phase==="IDLE";
+  $("started").textContent=S.started?"Driver Hub: STARTED":"Driver Hub: INIT";
+  $("started").className="pill "+(S.started?"ok":"");
+  $("samples").textContent=samples.length+" samples";
+  if(S.message)toast(S.message);
+  for(const id of ["l0","l1","l3"])$(id).textContent=f2(S.live.left);
+  for(const id of ["r0","r1","r3"])$(id).textContent=f2(S.live.right);
+  $("v0").textContent=S.live.supply==null?"-":f2(S.live.supply)+" V";
+  const okL=S.live.left!=null&&S.live.right!=null&&S.live.left>=1&&S.live.right>=1;
+  $("sensorOk").innerHTML=okL?"<span class='good'>Both sensors reading.</span>"+(S.live.supply<3.0||S.live.supply>3.6?" <span class='warn'>Supply should be about 3.3 V.</span>":""):"<span class='bad'>A sensor isn't reading. Check wiring (a reading under 1 in is a loose signal wire).</span>";
+
+  if(!geoInit&&document.activeElement.id!=="spacing"&&document.activeElement.id!=="setback"){$("spacing").value=c.spacing;$("setback").value=c.setback;geoInit=true}
+  const tapesTxt=S.steps.map(s=>s.tape).join(", ");
+  if(tapesTxt!==tapesInit&&document.activeElement.id!=="tapes"){$("tapes").value=tapesTxt;tapesInit=tapesTxt}
+
+  $("c1").className="card"+(stg==="CALIBRATE"?" active":" dim");
+  $("c2").className="card"+(stg==="RESULTS"?" active":" dim");
+  $("c3").className="card"+(stg==="DRIVE"?" active":" dim");
+  $("c0").className="card"+(samples.length&&recordedSteps().length===0&&stg==="CALIBRATE"?" active":"");
+
+  // step 1
+  const tape=S.steps[S.step]?S.steps[S.step].tape:0;
+  $("stepOf").textContent="step "+(S.step+1)+" of "+S.steps.length;
+  $("instr").innerHTML=`Put the object <b>${tape} in</b> from the front of the round sensor faces. Aim at it with <b>both</b> sensors and nudge it until both read the same. Then press Record and don't touch anything for ${(c.settleSec+c.recordSec).toFixed(1)} s.`;
+  $("prog").style.width=(S.progress*100)+"%";
+  $("phaseTxt").textContent=S.phase==="SETTLING"?"Settling... let the sensor's filter catch up":S.phase==="RECORDING"?"Recording...":"";
+  const cal=stg==="CALIBRATE";
+  $("rec").disabled=!(cal&&idle);$("rec").textContent=S.phase==="IDLE"?"Record "+tape+" in":"Recording...";
+  $("cancel").disabled=idle||!cal;$("redo").disabled=!(cal&&idle&&S.step>0);$("done").disabled=!(cal&&idle);
+  $("restart").disabled=stg==="DRIVE";$("setTapes").disabled=!(cal&&idle);
+  const tb=$("stepTable").tBodies[0];tb.innerHTML="";
+  S.steps.forEach((s,i)=>{
+    const tr=tb.insertRow();if(i===S.step&&cal)tr.className="cur";
+    tr.style.cursor="pointer";tr.onclick=()=>{if(cal&&idle)post("GOTO_STEP",{step:i})};
+    tr.insertCell().textContent=s.tape+" in";
+    tr.insertCell().textContent=s.recorded?f2(s.left):"-";
+    tr.insertCell().textContent=s.recorded?f2(s.right):"-";
+    tr.insertCell().textContent=s.recorded?f2(s.leftWobble)+" / "+f2(s.rightWobble):"-";
+  });
+  $("wobbleWarn").textContent=S.fit.maxWobble>c.jumpy?"Readings wobble a lot (over "+c.jumpy+" in). Unplug one sensor: if the other calms down they're hearing each other. If not, put a 100uF capacitor across the sensor's V+ and GND.":"";
+
+  // step 2
+  const L=S.fit.left,R=S.fit.right;
+  const vc=f=>f.points<3?"warn":f.worstBefore<=c.goodEnough||f.worstAfter<=c.goodEnough?"good":"bad";
+  $("verdicts").innerHTML=`<div class="verdict ${vc(L)}"><b>Left:</b> ${L.verdict}</div><div class="verdict ${vc(R)}"><b>Right:</b> ${R.verdict}</div>`;
+  const need=L.points>=3&&(L.worstBefore>c.goodEnough||R.worstBefore>c.goodEnough);
+  $("paste").innerHTML=need?`<p>Paste into <code>WallApproach</code> in FlowerApproachTest.java:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
+  if($("copy"))$("copy").onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($("pasteTxt").textContent);
+  $("goFix").disabled=!(stg==="RESULTS"&&L.sane&&R.sane);$("goNoFix").disabled=stg!=="RESULTS";$("restart2").disabled=stg!=="RESULTS";
+
+  // step 3
+  const d=S.drive;
+  $("stopAt").textContent="Should stop with the bumper "+f2(c.stopDistance,1)+" in from the object."+(c.setback===0?" (Setback is 0, so 'bumper' = sensor face.)":"");
+  $("hold").disabled=!(stg==="DRIVE"&&S.started&&!d.estop);
+  $("togo").textContent=d.active?f2(d.toGo)+" in":"-";$("ang").textContent=d.active?f2(d.angle,1)+"°":"-";
+  let info=d.estop?"E-STOP latched. Press Reset stop.":!S.started?"Press START on the Driver Hub first.":d.note;
+  if(d.result==="DONE")info=`DONE. Robot thinks the bumper is ${f2(d.bumper)} in away. Tape it and log the trial.`;
+  else if(d.result==="FAILED")info="Gave up (timeout or bad reading). Hold again to retry.";
+  else if(d.active)info="Driving... let go to stop.";
+  $("driveInfo").textContent=info;
+  $("back").disabled=stg!=="DRIVE";$("logTrial").disabled=stg!=="DRIVE";
+  const tt=$("trialTable").tBodies[0];tt.innerHTML="";
+  for(const t of S.trials){const tr=tt.insertRow();tr.insertCell().textContent=t.n;tr.insertCell().textContent=f2(t.thinks);tr.insertCell().textContent=f2(t.measured);tr.insertCell().textContent=f2(t.thinks-t.measured);tr.insertCell().textContent=t.result+(t.fix?" (fix)":"")}
+
+  drawAll();
+}
+
+// ---------- buttons ----------
+$("sendGeo").onclick=()=>post("SET_GEOMETRY",{spacing:parseFloat($("spacing").value),setback:parseFloat($("setback").value)});
+$("rec").onclick=()=>post("RECORD");$("cancel").onclick=()=>post("CANCEL");$("redo").onclick=()=>post("REDO");
+$("done").onclick=()=>post("DONE");
+$("restart").onclick=$("restart2").onclick=()=>{if(confirm("Throw away this run's formula-check results and start over? (The raw samples stay in the log.)"))post("RESTART")};
+$("setTapes").onclick=()=>{const t=$("tapes").value.split(/[\s,]+/).map(parseFloat).filter(x=>x>0&&isFinite(x));if(t.length){tapesInit="";post("SET_TAPES",{tapes:t})}else toast("Enter some distances like 4, 6, 8, 12")};
+$("goFix").onclick=()=>post("GO_DRIVE",{fix:true});$("goNoFix").onclick=()=>post("GO_DRIVE",{fix:false});
+$("back").onclick=()=>post("BACK");$("estop").onclick=()=>post("ESTOP");$("reset").onclick=()=>post("RESET");
+$("logTrial").onclick=()=>{const m=parseFloat($("measured").value);if(isFinite(m))post("LOG_TRIAL",{measured:m});else toast("Type the tape-measured distance first")};
+document.querySelectorAll("[data-win]").forEach(b=>b.onclick=()=>{windowSec=+b.dataset.win;drawAll()});
+$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"Resume":"Pause";drawAll()};
+
+// hold to drive: keeps pinging while held, the robot stops if the pings stop
+let beat=null;
+function startBeat(e){if($("hold").disabled)return;try{$("hold").setPointerCapture(e.pointerId)}catch(_){}
+  if(beat)return;const ping=()=>fetch("/api/cmd",{method:"POST",body:JSON.stringify({cmd:"DRIVE_HEARTBEAT"}),keepalive:true}).catch(()=>{});
+  ping();beat=setInterval(ping,80);$("hold").textContent="DRIVING... (release to stop)"}
+function stopBeat(){if(beat){clearInterval(beat);beat=null}$("hold").textContent="HOLD TO DRIVE"}
+const hb=$("hold");
+hb.addEventListener("pointerdown",startBeat);
+for(const ev of ["pointerup","pointercancel","lostpointercapture","pointerleave"])hb.addEventListener(ev,stopBeat);
+window.addEventListener("blur",stopBeat);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopBeat()});
+hb.addEventListener("contextmenu",e=>e.preventDefault());
+
+// ---------- CSV (built here from our copy of the data) ----------
+const fx=(x,d=4)=>x==null?"":Number(x).toFixed(d);
+function rawCsv(){
+  let o="t_s,attempt,step,phase,counted,corrected,tape_in,left_in,right_in,supply_v\n";
+  for(const s of samples)o+=[fx(s[1]),s[3],s[2]+1,PHASES[s[4]],s[5],s[6],fx(s[7]),fx(s[8]),fx(s[9]),fx(s[10])].join(",")+"\n";
+  return o}
+function summaryCsv(){
+  let o="step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples\n";
+  if(S)S.steps.forEach((s,i)=>{if(s.recorded)o+=[i+1,fx(s.tape),fx(s.left),fx(s.right),fx(s.leftWobble),fx(s.rightWobble),fx(s.left-s.tape),fx(s.right-s.tape),s.n].join(",")+"\n"});
+  return o}
+function fitCsv(){
+  let o="sensor,scale,offset,r2,rmse_in,max_error_before_in,max_error_after_in,points,sensor_spacing_in,sensor_setback_in\n";
+  if(S)for(const k of ["left","right"]){const f=S.fit[k];o+=[k,fx(f.scale),fx(f.offset),fx(f.r2),fx(f.rmse),fx(f.worstBefore),fx(f.worstAfter),f.points,fx(S.config.spacing),fx(S.config.setback)].join(",")+"\n"}
+  return o}
+function trialsCsv(){
+  let o="trial,robot_thinks_in,tape_measured_in,error_in,result,fix_applied\n";
+  if(S)for(const t of S.trials)o+=[t.n,fx(t.thinks),fx(t.measured),fx(t.thinks-t.measured),t.result,t.fix?1:0].join(",")+"\n";
+  return o}
+function download(name,text){
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"}));a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+const stamp=()=>new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+$("dlRaw").onclick=()=>download("flower_raw_"+stamp()+".csv",rawCsv());
+$("dlSum").onclick=()=>download("flower_summary_"+stamp()+".csv",summaryCsv());
+$("dlFit").onclick=()=>download("flower_fit_"+stamp()+".csv",fitCsv());
+$("dlTrials").onclick=()=>download("flower_trials_"+stamp()+".csv",trialsCsv());
+$("dlAll").onclick=()=>{const s=stamp();download("flower_raw_"+s+".csv",rawCsv());setTimeout(()=>download("flower_summary_"+s+".csv",summaryCsv()),300);setTimeout(()=>download("flower_fit_"+s+".csv",fitCsv()),600);setTimeout(()=>download("flower_trials_"+s+".csv",trialsCsv()),900)};
+
+// ---------- charts, drawn by hand because the robot's wifi has no internet ----------
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function setup(cv){
+  const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+  const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+  return{g,w,h,m:{l:46,r:12,t:10,b:30}}}
+function niceTicks(lo,hi,n=5){
+  if(!(hi>lo)){hi=lo+1}
+  const raw=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p,st=(f<1.5?1:f<3?2:f<7?5:10)*p;
+  const out=[];for(let v=Math.ceil(lo/st)*st;v<=hi+1e-9;v+=st)out.push(+v.toFixed(6));return{out,st}}
+function axes(c,x0,x1,y0,y1,xl,yl){
+  const{g,w,h,m}=c;const X=v=>m.l+(v-x0)/(x1-x0)*(w-m.l-m.r),Y=v=>h-m.b-(v-y0)/(y1-y0)*(h-m.t-m.b);
+  g.font="12px system-ui";g.fillStyle=css("--mute");g.strokeStyle=css("--line");g.lineWidth=1;
+  g.textAlign="right";g.textBaseline="middle";
+  for(const v of niceTicks(y0,y1).out){const y=Y(v);g.beginPath();g.moveTo(m.l,y);g.lineTo(w-m.r,y);g.stroke();g.fillText(v,m.l-6,y)}
+  g.textAlign="center";g.textBaseline="top";
+  for(const v of niceTicks(x0,x1).out){const x=X(v);g.beginPath();g.moveTo(x,m.t);g.lineTo(x,h-m.b);g.stroke();g.fillText(v,x,h-m.b+4)}
+  g.fillText(xl,(m.l+w-m.r)/2,h-14);
+  g.save();g.translate(11,(m.t+h-m.b)/2);g.rotate(-Math.PI/2);g.textBaseline="top";g.fillText(yl,0,-8);g.restore();
+  return{X,Y}}
+function addTip(cv,key){
+  const tip=cv.parentElement.querySelector(".tip");
+  cv.onmousemove=e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;let best=null,bd=18;
+    for(const p of hover[key]||[]){const d=Math.hypot(p.x-mx,p.y-my);if(d<bd){bd=d;best=p}}
+    if(best){tip.style.display="block";tip.textContent=best.text;tip.style.left=Math.min(mx+10,r.width-150)+"px";tip.style.top=(my-26)+"px"}else tip.style.display="none"};
+  cv.onmouseleave=()=>tip.style.display="none"}
+
+function drawA(){
+  const cv=$("chA"),c=setup(cv),{g,w,h,m}=c;hover.A=[];
+  let data=samples;if(!data.length){return}
+  const tEnd=data[data.length-1][1];
+  const view=paused?(drawA.frozen||(drawA.frozen=tEnd)):(drawA.frozen=null,tEnd);
+  const t0=windowSec?view-windowSec:data[0][1],t1=Math.max(view,t0+1);
+  let vis=data.filter(s=>s[1]>=t0&&s[1]<=t1);
+  let ymin=1e9,ymax=-1e9;
+  for(const s of vis)for(const v of [s[8],s[9],s[7]])if(v!=null){ymin=Math.min(ymin,v);ymax=Math.max(ymax,v)}
+  if(ymin>ymax){ymin=0;ymax=10}
+  const pad=Math.max(0.5,(ymax-ymin)*.1);ymin=Math.max(0,ymin-pad);ymax+=pad;
+  const{X,Y}=axes(c,t0,t1,ymin,ymax,"robot time (s)","inches");
+  // shaded settling / recording
+  g.fillStyle=css("--band");let start=null,ph=0;
+  for(let i=0;i<=vis.length;i++){const s=vis[i],p=s?s[4]:0,act=p===1||p===2;
+    if(act&&start===null){start=s[1]}
+    if(!act&&start!==null){const end=vis[i-1][1];g.fillRect(X(start),m.t,Math.max(1,X(end)-X(start)),h-m.t-m.b);start=null}}
+  // tape target (dashed)
+  g.save();g.setLineDash([5,4]);g.strokeStyle=css("--mute");g.lineWidth=1.5;g.beginPath();let pen=false,last=null;
+  for(const s of vis){if(s[7]==null||(s[4]===3)){pen=false;continue}
+    const x=X(s[1]),y=Y(s[7]);if(!pen||s[7]!==last){g.moveTo(x,y);pen=true}else g.lineTo(x,y);last=s[7]}
+  g.stroke();g.restore();
+  // lines, downsampled so 50 Hz for an hour stays smooth
+  const stride=Math.max(1,Math.floor(vis.length/((w-m.l-m.r)*2)));
+  for(const [idx,col] of [[8,"--left"],[9,"--right"]]){
+    g.strokeStyle=css(col);g.lineWidth=1.6;g.beginPath();let moved=false;
+    for(let i=0;i<vis.length;i+=stride){const v=vis[i][idx];if(v==null){moved=false;continue}
+      const x=X(vis[i][1]),y=Y(v);if(!moved){g.moveTo(x,y);moved=true}else g.lineTo(x,y)}
+    g.stroke()}
+  const hs=Math.max(1,Math.floor(vis.length/200));
+  for(let i=0;i<vis.length;i+=hs){const s=vis[i];hover.A.push({x:X(s[1]),y:Y(s[8]==null?0:s[8]),text:`t ${f2(s[1],1)} s  L ${f2(s[8])}  R ${f2(s[9])}`+(s[7]!=null?"  target "+s[7]:"")})}
+  addTip(cv,"A")}
+
+function drawB(){
+  const cv=$("chB"),c=setup(cv),{g}=c;hover.B=[];
+  const st=recordedSteps();let lo=0,hi=10;
+  if(st.length){hi=Math.max(...st.map(s=>Math.max(s.tape,s.left,s.right)))*1.1+1}
+  const{X,Y}=axes(c,0,hi,0,hi,"sensor reading (in)","tape distance (in)");
+  g.save();g.setLineDash([6,5]);g.strokeStyle=css("--mute");g.beginPath();g.moveTo(X(0),Y(0));g.lineTo(X(hi),Y(hi));g.stroke();g.restore();
+  const leg=[];
+  for(const [k,col,name] of [["left","--left","Left"],["right","--right","Right"]]){
+    const color=css(col),pts=st.map(s=>[s[k],s.tape,s[k+"Wobble"]]);
+    const fit=fitOf(pts);
+    if(pts.length>=2){g.strokeStyle=color;g.lineWidth=2;g.beginPath();
+      // tape = scale*reading + offset, so reading = (tape - offset)/scale
+      const r0=(0-fit.offset)/fit.scale,r1=(hi-fit.offset)/fit.scale;g.moveTo(X(r0),Y(0));g.lineTo(X(r1),Y(hi));g.stroke()}
+    for(const [r,t,wob] of pts){const x=X(r),y=Y(t);
+      g.strokeStyle=color;g.lineWidth=1.2;g.beginPath();g.moveTo(x-wob/2*(X(1)-X(0)),y);g.lineTo(x+wob/2*(X(1)-X(0)),y);g.stroke();
+      g.fillStyle=color;g.beginPath();g.arc(x,y,4.5,0,7);g.fill();
+      hover.B.push({x,y,text:`${name}: read ${f2(r)} / tape ${t} (wobble ${f2(wob)})`})}
+    const F=S&&S.fit[k];
+    if(pts.length>=2&&F)leg.push(`<span><i style="background:${color}"></i>${name}: tape = ${F.scale.toFixed(4)} &times; reading ${F.offset<0?"-":"+"} ${Math.abs(F.offset).toFixed(3)} &nbsp; R&sup2; ${F.r2.toFixed(5)}, rmse ${F.rmse.toFixed(3)} in${Math.abs(F.scale-fit.scale)>1e-6||Math.abs(F.offset-fit.offset)>1e-6?" <b class='bad'>(page and robot fits disagree!)</b>":""}</span>`);
+    else leg.push(`<span><i style="background:${color}"></i>${name}: record at least 2 distances for a fit</span>`)}
+  $("legB").innerHTML=leg.join("");
+  addTip(cv,"B")}
+
+function drawC(){
+  const cv=$("chC"),c=setup(cv),{g}=c;hover.C=[];
+  const st=recordedSteps(),ge=S?S.config.goodEnough:.25;
+  let m=ge*2;for(const s of st)m=Math.max(m,Math.abs(s.left-s.tape),Math.abs(s.right-s.tape));m*=1.15;
+  const tmax=st.length?Math.max(...st.map(s=>s.tape))*1.1+1:10;
+  const{X,Y}=axes(c,0,tmax,-m,m,"tape distance (in)","reading minus tape (in)");
+  g.fillStyle=css("--band");g.fillRect(X(0),Y(ge),X(tmax)-X(0),Y(-ge)-Y(ge));
+  g.strokeStyle=css("--mute");g.beginPath();g.moveTo(X(0),Y(0));g.lineTo(X(tmax),Y(0));g.stroke();
+  for(const [k,col,name] of [["left","--left","Left"],["right","--right","Right"]]){
+    const color=css(col),pts=st.map(s=>[s[k],s.tape]),fit=fitOf(pts);
+    for(const [r,t] of pts){
+      let x=X(t),y=Y(r-t);g.fillStyle=color;g.beginPath();g.arc(x,y,4.5,0,7);g.fill();hover.C.push({x,y,text:`${name} before fix: ${f2(r-t)} in off at ${t}`});
+      if(pts.length>=2){y=Y(fit.scale*r+fit.offset-t);g.strokeStyle=color;g.lineWidth=2;g.beginPath();g.arc(x,y,5.5,0,7);g.stroke();hover.C.push({x,y,text:`${name} after fix: ${f2(fit.scale*r+fit.offset-t)} in off at ${t}`})}}}
+  addTip(cv,"C")}
+
+let pending=false;
+function drawAll(){if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;try{drawA();drawB();drawC()}catch(e){console.error(e)}})}
+window.addEventListener("resize",drawAll);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",drawAll);
+
+loadLocal();if(S)render();
+poll();
+</script>
+</body>
+</html>

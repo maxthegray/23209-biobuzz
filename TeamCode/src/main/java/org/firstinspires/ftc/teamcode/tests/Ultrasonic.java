@@ -25,7 +25,7 @@ public class Ultrasonic extends LinearOpMode {
      * Vcc is measured on a second analog channel, so the result does not depend on what the
      * supply voltage actually is or on the ADC's scaling: only on the ratio Vout / Vcc.
      */
-    static class HrlvShortRange {
+    public static class HrlvShortRange {
         static final double MM_PER_BIT = 6.0;
         static final double OFFSET_MM = -300.0;
         // Datasheet: minimum reported distance is 20 mm, maximum is 5000 mm
@@ -39,16 +39,16 @@ public class Ultrasonic extends LinearOpMode {
         private int count = 0;
         private int next = 0;
 
-        HrlvShortRange(AnalogInput signal, AnalogInput vcc) {
+        public HrlvShortRange(AnalogInput signal, AnalogInput vcc) {
             this.signal = signal;
             this.vcc = vcc;
         }
 
-        double getSignalVoltage() {
+        public double getSignalVoltage() {
             return signal.getVoltage();
         }
 
-        double getVccVoltage() {
+        public double getVccVoltage() {
             return vcc.getVoltage();
         }
 
@@ -57,7 +57,7 @@ public class Ultrasonic extends LinearOpMode {
          * last SAMPLES readings, which rejects the occasional spike the sensor outputs.
          * Returns NaN until the supply reads a sane voltage (sensor unpowered / miswired).
          */
-        double getDistanceMm() {
+        public double getDistanceMm() {
             double supply = vcc.getVoltage();
             if (supply < 1.0) return Double.NaN;
 
