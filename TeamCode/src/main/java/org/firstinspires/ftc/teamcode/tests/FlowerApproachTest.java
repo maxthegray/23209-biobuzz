@@ -390,8 +390,8 @@ public class FlowerApproachTest extends LinearOpMode {
         static final double timeoutSec = 4.0;
 
         // paste the numbers from this test's results screen here. corrected = scale * reading + offset
-        static final double leftScale = 1.0, leftOffset = 0.0;
-        static final double rightScale = 1.0, rightOffset = 0.0;
+        static final double leftScale = 1.2318, leftOffset = 2.144;
+        static final double rightScale = 1.2270, rightOffset = 2.487;
         private double leftScaleNow = leftScale, leftOffsetNow = leftOffset;
         private double rightScaleNow = rightScale, rightOffsetNow = rightOffset;
         static final double minReading = 1.0;   // in. under this is a loose signal wire (it reads as 0.8), not a real wall
