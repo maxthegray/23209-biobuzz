@@ -114,7 +114,7 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
         }
     }
 
-    // reads each sensor once (the median filter moves on every read), shows raw + fix + corrected, returns {left, right} corrected
+    // reads each sensor once, shows raw + fix + corrected, returns {left, right} corrected
     private double[] showReadings(WallApproach sensors) {
         double rawL = sensors.rawLeft(), rawR = sensors.rawRight();
         double left = WallApproach.leftScale * rawL + WallApproach.leftOffset;

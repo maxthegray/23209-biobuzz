@@ -59,7 +59,7 @@ public class DriveStraightUltrasonic extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            // Read every loop so the median filters stay fresh even while not driving
+            // Read every loop so the filters stay fresh even while not driving
             double leftMm = left.getDistanceMm();
             double rightMm = right.getDistanceMm();
 

@@ -182,8 +182,8 @@ public class FlowerApproachTest extends LinearOpMode {
         driving = false;
     }
 
-    // reads the sensors exactly once per loop. the sensor class keeps a short history that moves on every call,
-    // so extra calls would change how much it smooths
+    // reads the sensors once per loop so the logged volts match the logged distance.
+    // (the sensor filter averages by time, not calls, so an extra read wouldn't hurt the smoothing)
     private void sample(double t) {
         double l, r;
         boolean driveStage = session.stage() == Stage.DRIVE;
