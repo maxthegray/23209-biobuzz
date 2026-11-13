@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
-import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
+import org.firstinspires.ftc.teamcode.vision.ultrasonic.WallApproach;
 
 // autonomous: after START the robot turns in place on its own until both ultrasonic sensors read the same distance,
 // so it ends up square to the wall. no buttons needed.
@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
 @Autonomous(name = "UltrasonicAlignment", group = "test")
 public class UltrasonicAutoAlignment extends LinearOpMode {
 
-    static final double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 3.6 deg with 16 in spacing
+    static final double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 7.6 deg with the 7.5 in spacing
     static final double maxTurn = 0.35;
     static final double minTurn = 0.08;   // starting minimum, the push below adds to it until the robot actually turns
     static final double pushRate = 0.4;   // power per second added while the robot is stuck (not turning)

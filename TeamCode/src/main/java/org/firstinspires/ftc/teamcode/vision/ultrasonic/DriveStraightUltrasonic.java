@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.Range;
 
-import org.firstinspires.ftc.teamcode.tests.Ultrasonic.HrlvShortRange;
 
 /**
  * Hold TRIANGLE to drive forward toward the wall. Each side of the drivetrain is controlled by the

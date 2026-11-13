@@ -1,13 +1,9 @@
 package org.firstinspires.ftc.teamcode.tests;
 
 import com.pedropathing.follower.Follower;
-import com.pedropathing.math.Velocity;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.AnalogInput;
-import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
@@ -16,6 +12,7 @@ import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession.Phase;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession.Stage;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.Command;
+import org.firstinspires.ftc.teamcode.vision.ultrasonic.WallApproach;
 import org.json.JSONArray;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -248,7 +245,7 @@ public class FlowerApproachTest extends LinearOpMode {
         boolean differs = Math.abs(leftFit.scale - k[0]) > 0.005 || Math.abs(leftFit.offset - k[1]) > 0.02
                 || Math.abs(rightFit.scale - k[2]) > 0.005 || Math.abs(rightFit.offset - k[3]) > 0.02;
         if (Math.max(worst[0], worst[1]) > goodEnough && differs) {
-            telemetry.addLine("Update the fix in WallApproach (FlowerApproachTest.java) to:");
+            telemetry.addLine("Update the fix in vision/ultrasonic/WallApproach.java to:");
             telemetry.addLine(String.format("  leftScale = %.4f, leftOffset = %.3f", leftFit.scale, leftFit.offset));
             telemetry.addLine(String.format("  rightScale = %.4f, rightOffset = %.3f", rightFit.scale, rightFit.offset));
         }
@@ -305,7 +302,7 @@ public class FlowerApproachTest extends LinearOpMode {
             telemetry.addLine(String.format("DONE. Thinks the bumper is %.2f in away. Tape it and compare", approach.bumperToWall()));
             telemetry.addLine("Hold again for another try");
         } else if (result == WallApproach.Result.FAILED) {
-            telemetry.addLine("Gave up (4 s timeout or a bad reading). Hold again to try again");
+            telemetry.addLine("Gave up (6 s timeout or a bad reading). Hold again to try again");
         } else if (driving) {
             telemetry.addLine("Driving... let go to stop");
         }
@@ -357,215 +354,6 @@ public class FlowerApproachTest extends LinearOpMode {
         // judged on how well the points sit on a line, not how big the fix is. ours really is ~23% and that's fine
         public boolean sane() {
             return points >= 3 && r2 > 0.99 && rmse < 0.5 && scale > 0.5 && scale < 2 && Math.abs(offset) < 6;
-        }
-    }
-
-    // average of the two sensors = distance to the wall, difference = how crooked we are
-    // drives through pedro's manual mode so pedro keeps tracking position
-    public static class WallApproach {
-
-        public enum Result { RUNNING, DONE, FAILED }
-
-        public static final double defaultSpacing = 7.5;   // in, center to center, measured 2026-11-09 (the website can change it for a run)
-        public static final double defaultSetback = 0.0;   // in, how far the sensors sit behind the bumper. measure this
-        private double sensorSpacing = defaultSpacing;
-        private double sensorSetback = defaultSetback;
-
-        static final double flowerFromWall = 3.0;   // guess, measure on a real field
-        static final double flowerReach = 2.4;   // top ring sticks out this far
-        static final double clearance = 1.0;   // don't touch the flower
-        public static final double stopDistance = flowerFromWall + flowerReach + clearance;   // bumper to wall
-
-        static final double kpDrive = 0.06;
-        static final double kpTurn = 0.015;
-        static final double maxDrive = 0.25;   // sensors only update ~10x a second
-        static final double maxTurn = 0.15;
-        static final double minPower = 0.07;
-        static final double kpStrafe = 0.06;
-        static final double maxStrafe = 0.2;
-        static final double minStrafe = 0.05;
-        static final double minTurn = 0.05;
-        static final double pushRate = 0.6;   // power per second added while a direction is stuck, low powers can't beat the wheel friction
-        static final double maxPush = 0.25;
-
-        static final double distanceTolerance = 0.5;
-        static final double angleTolerance = 2.0;
-        static final double strafeTolerance = 0.75;
-        static final double settleSec = 0.3;   // sensors only update every 100 ms, so wait for a few fresh readings
-        static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower
-        static final double timeoutSec = 4.0;
-
-        // paste the numbers from this test's results screen here. corrected = scale * reading + offset
-        public static final double leftScale = 1.3844, leftOffset = 1.471;
-        public static final double rightScale = 1.2481, rightOffset = 2.256;
-
-        public static double[] pastedFix() {
-            return new double[]{leftScale, leftOffset, rightScale, rightOffset};
-        }
-        private double leftScaleNow = leftScale, leftOffsetNow = leftOffset;
-        private double rightScaleNow = rightScale, rightOffsetNow = rightOffset;
-        static final double minReading = 1.0;   // in. under this is a loose signal wire (it reads as 0.8), not a real wall
-
-        private final Ultrasonic.HrlvShortRange leftSensor, rightSensor;
-        private final ElapsedTime timer = new ElapsedTime();
-        private final ElapsedTime sinceUpdate = new ElapsedTime();
-        private double drivePush, turnPush, strafePush;
-        private final ElapsedTime onTargetFor = new ElapsedTime();
-        private double target = stopDistance;
-
-        private double left, right, wallDist, error, angle, drivePower, strafePower, turnPower;
-        private boolean useAngle = true;
-
-        public WallApproach(HardwareMap hardwareMap) {
-            leftSensor = new Ultrasonic.HrlvShortRange(
-                    hardwareMap.get(AnalogInput.class, "ultrasonic_left_signal"),
-                    hardwareMap.get(AnalogInput.class, "ultrasonic_left_vcc"));
-            rightSensor = new Ultrasonic.HrlvShortRange(
-                    hardwareMap.get(AnalogInput.class, "ultrasonic_right_signal"),
-                    hardwareMap.get(AnalogInput.class, "ultrasonic_right_vcc"));
-        }
-
-        public void start() {
-            start(stopDistance);
-        }
-
-        public void start(double bumperToWall) {
-            target = bumperToWall;
-            timer.reset();
-            onTargetFor.reset();
-            sinceUpdate.reset();
-            drivePush = turnPush = strafePush = 0;
-        }
-
-        public Result update(Follower follower) {
-            return update(follower, 0);
-        }
-
-        // sets pedro's manual powers. caller still has to call follower.update()
-        // leftError = inches the target is to the robot's left (from pedro, the sensors only see ahead), 0 to skip
-        public Result update(Follower follower, double leftError) {
-            if (timer.seconds() > timeoutSec) {
-                follower.manual(0, 0, 0);
-                return Result.FAILED;
-            }
-
-            left = leftNow();
-            right = rightNow();
-            if (Double.isNaN(left) || Double.isNaN(right) || left < minReading || right < minReading) {
-                follower.manual(0, 0, 0);
-                return Result.FAILED;
-            }
-
-            useAngle = Math.abs(left - right) < maxSkew;
-            wallDist = useAngle ? (left + right) / 2.0 : Math.max(left, right);
-            error = wallDist - sensorSetback - target;
-            angle = useAngle ? angleFrom(left, right) : 0;
-
-            boolean onTarget = Math.abs(error) < distanceTolerance && Math.abs(angle) < angleTolerance;
-            if (!onTarget) onTargetFor.reset();
-            if (onTargetFor.seconds() >= settleSec) {
-                follower.manual(0, 0, 0);
-                return Result.DONE;
-            }
-
-            double dt = Math.min(sinceUpdate.seconds(), 0.1);
-            sinceUpdate.reset();
-            Velocity v = follower.velocity();
-            double heading = follower.pose().heading();
-            double forwardSpeed = v.vx * Math.cos(heading) + v.vy * Math.sin(heading);
-            double leftSpeed = -v.vx * Math.sin(heading) + v.vy * Math.cos(heading);
-            drivePush = push(drivePush, error, distanceTolerance, Math.abs(forwardSpeed) > 1, dt);
-            turnPush = push(turnPush, angle, angleTolerance, Math.abs(v.omega) > 0.05, dt);
-            strafePush = push(strafePush, leftError, strafeTolerance, Math.abs(leftSpeed) > 1, dt);
-
-            drivePower = atLeast(Range.clip(kpDrive * error, -maxDrive, maxDrive), error, distanceTolerance, minPower + drivePush);
-            turnPower = -atLeast(Range.clip(kpTurn * angle, -maxTurn, maxTurn), angle, angleTolerance, minTurn + turnPush);
-            strafePower = atLeast(Range.clip(kpStrafe * leftError, -maxStrafe, maxStrafe), leftError, strafeTolerance, minStrafe + strafePush);
-
-            follower.manual(drivePower, strafePower, turnPower);   // forward, left, ccw (robot-centric)
-            return Result.RUNNING;
-        }
-
-        public void showReadings(Telemetry telemetry) {
-            double l = leftNow();
-            double r = rightNow();
-            telemetry.addData("Left / Right", "%.1f in / %.1f in", l, r);
-            telemetry.addData("Angle", "%.1f deg", angleFrom(l, r));
-            telemetry.addData("Stops at", "%.1f in from the wall", stopDistance);
-        }
-
-        public void addTelemetry(Telemetry telemetry) {
-            telemetry.addData("Left / Right", "%.1f in / %.1f in", left, right);
-            telemetry.addData("Wall", "%.1f in (%.1f to go)", wallDist, error);
-            telemetry.addData("Angle", useAngle ? String.format("%.1f deg", angle) : "ignored (one sensor sees the flower)");
-            telemetry.addData("Power", "drive %.2f  strafe %.2f  turn %.2f", drivePower, strafePower, turnPower);
-        }
-
-        // grows while that direction is stuck, stays once it gets going, back to 0 once it's there
-        static double push(double push, double error, double tolerance, boolean moving, double dt) {
-            if (Math.abs(error) <= tolerance) return 0;
-            if (!moving) push += pushRate * dt;
-            return Math.min(push, maxPush);
-        }
-
-        // at least min power while it's outside the tolerance
-        static double atLeast(double power, double error, double tolerance, double min) {
-            if (Math.abs(error) <= tolerance) return power;
-            return Math.copySign(Math.max(Math.abs(power), min), error);
-        }
-
-        // for this run only, the test uses it to try a fix before you paste it in
-        public void useCorrection(double leftScale, double leftOffset, double rightScale, double rightOffset) {
-            leftScaleNow = leftScale;
-            leftOffsetNow = leftOffset;
-            rightScaleNow = rightScale;
-            rightOffsetNow = rightOffset;
-        }
-
-        // inches straight from the datasheet formula, no fix
-        public double rawLeft() {
-            return leftSensor.getDistanceMm() / 25.4;
-        }
-
-        public double rawRight() {
-            return rightSensor.getDistanceMm() / 25.4;
-        }
-
-        public double leftNow() {
-            return leftScaleNow * rawLeft() + leftOffsetNow;
-        }
-
-        public double rightNow() {
-            return rightScaleNow * rawRight() + rightOffsetNow;
-        }
-
-        public double supplyVolts() {
-            return Math.min(leftSensor.getVccVoltage(), rightSensor.getVccVoltage());
-        }
-
-        // the website's measurements, for this run only
-        public void setGeometry(double spacing, double setback) {
-            sensorSpacing = spacing;
-            sensorSetback = setback;
-        }
-
-        public double sensorSetback() {
-            return sensorSetback;
-        }
-
-        // left, right, wall, toGo, angle, drivePower, strafePower, turnPower, bumper from the last update()
-        public double[] snapshot() {
-            return new double[]{left, right, wallDist, error, angle, drivePower, strafePower, turnPower, bumperToWall()};
-        }
-
-        // bumper to wall from the last reading
-        public double bumperToWall() {
-            return wallDist - sensorSetback;
-        }
-
-        // left reading longer than right = turned ccw
-        double angleFrom(double left, double right) {
-            return Math.toDegrees(Math.atan2(left - right, sensorSpacing));
         }
     }
 }

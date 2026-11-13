@@ -22,7 +22,7 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
-import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest;
+import org.firstinspires.ftc.teamcode.vision.ultrasonic.WallApproach;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +77,7 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private Follower follower;
     private BatteryDrive drive;
-    private FlowerApproachTest.WallApproach sonar;
+    private WallApproach sonar;
     private boolean approaching = false;
     private String sonarResult = "-";
     private String stepNote = "";
@@ -100,7 +100,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         drive = new BatteryDrive(hardwareMap);
         follower = new Follower(new PinpointLocalizer(hardwareMap, Constants.localizerConfig), drive, new Foresight(Constants.foresightConfig));
         try {
-            sonar = new FlowerApproachTest.WallApproach(hardwareMap);
+            sonar = new WallApproach(hardwareMap);
         } catch (IllegalArgumentException e) {
             sonar = null;   // not in the robot config, flowers just use pedro
         }
@@ -210,9 +210,9 @@ public class PathDemoAllCombos extends LinearOpMode {
         status = "Ultrasonic adjust";
         approaching = true;
         sonar.start();
-        FlowerApproachTest.WallApproach.Result result = FlowerApproachTest.WallApproach.Result.RUNNING;
+        WallApproach.Result result = WallApproach.Result.RUNNING;
         boolean wandered = false;
-        while (opModeIsActive() && result == FlowerApproachTest.WallApproach.Result.RUNNING && !outOfTime()) {
+        while (opModeIsActive() && result == WallApproach.Result.RUNNING && !outOfTime()) {
             result = sonar.update(follower, leftOf(pickup));
             follower.update();
             wandered = follower.pose().distance(pickup) > maxAdjust;   // bad readings would drive it off somewhere, pedro is the boss
@@ -220,7 +220,7 @@ public class PathDemoAllCombos extends LinearOpMode {
             updateTelemetry();
         }
         approaching = false;
-        if (result == FlowerApproachTest.WallApproach.Result.DONE) {
+        if (result == WallApproach.Result.DONE) {
             stepNote = " sonar";
             fixPoseFromWall();
             return true;

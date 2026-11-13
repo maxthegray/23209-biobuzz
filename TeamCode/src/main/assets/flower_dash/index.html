@@ -286,7 +286,7 @@ function render(){
   $("verdicts").innerHTML=say("Left",wl)+say("Right",wr);
   const kc=codeFix(),differs=Math.abs(L.scale-kc[0])>0.005||Math.abs(L.offset-kc[1])>0.02||Math.abs(R.scale-kc[2])>0.005||Math.abs(R.offset-kc[3])>0.02;
   const need=fs.length>=3&&L.points>=3&&Math.max(wl,wr)>c.goodEnough&&differs;   // no point telling you to paste what's already there
-  $("paste").innerHTML=need?`<p>Update the fix in <code>WallApproach</code> (FlowerApproachTest.java) to:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
+  $("paste").innerHTML=need?`<p>Update the fix in <code>vision/ultrasonic/WallApproach.java</code> to:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
   if($("copy"))$("copy").onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($("pasteTxt").textContent);
   $("goFix").disabled=!(stg==="RESULTS"&&L.sane&&R.sane);$("goNoFix").disabled=stg!=="RESULTS";$("restart2").disabled=stg!=="RESULTS";
 
