@@ -200,7 +200,7 @@ public class FlowerApproachTest extends LinearOpMode {
         }
         cachedLeft = l;
         cachedRight = r;
-        session.tick(t, l, r, approach.supplyVolts(), driveStage);
+        session.tick(t, l, r, approach.supplyVolts(), approach.lastVolts(), driveStage);
     }
 
     private void calibrate() {
@@ -222,7 +222,9 @@ public class FlowerApproachTest extends LinearOpMode {
         telemetry.addLine("");
         double[] k = WallApproach.pastedFix();
         telemetry.addLine(String.format("Live  left %5.2f in   right %5.2f in", k[0] * cachedLeft + k[1], k[2] * cachedRight + k[3]));
+        double[] v = approach.lastVolts();
         telemetry.addLine(String.format("Sensor supply %.2f V (should be about 3.3)", approach.supplyVolts()));
+        telemetry.addLine(String.format("Signal  left %.3f V   right %.3f V", v[0], v[2]));
         telemetry.addLine("");
         telemetry.addLine("A = record   B = redo last step   X = done, show results");
     }
@@ -241,7 +243,7 @@ public class FlowerApproachTest extends LinearOpMode {
         double[] worst = session.worstWithFix(k);
         telemetry.addLine(String.format("Left:  worst %.2f in off %s", worst[0], worst[0] <= goodEnough ? "- good" : "- record again"));
         telemetry.addLine(String.format("Right: worst %.2f in off %s", worst[1], worst[1] <= goodEnough ? "- good" : "- record again"));
-        if (session.maxWobble() > jumpy) {
+        if (session.maxNoise() > CalibrationSession.NOISY) {
             telemetry.addLine("Readings wobble a lot. Unplug one sensor, if the other calms down they hear each other");
             telemetry.addLine("If not, datasheet says put a 100uF capacitor across the sensor's V+ and GND");
         }
@@ -539,8 +541,15 @@ public class FlowerApproachTest extends LinearOpMode {
             return rightScaleNow * rawRight() + rightOffsetNow;
         }
 
+        // from the last reading, doesn't read the hub again
         public double supplyVolts() {
-            return Math.min(leftSensor.getVccVoltage(), rightSensor.getVccVoltage());
+            return Math.min(leftSensor.lastVccVoltage(), rightSensor.lastVccVoltage());
+        }
+
+        // {left signal, left vcc, right signal, right vcc} in volts from the last reading, for the log
+        public double[] lastVolts() {
+            return new double[]{leftSensor.lastSignalVoltage(), leftSensor.lastVccVoltage(),
+                    rightSensor.lastSignalVoltage(), rightSensor.lastVccVoltage()};
         }
 
         // the website's measurements, for this run only

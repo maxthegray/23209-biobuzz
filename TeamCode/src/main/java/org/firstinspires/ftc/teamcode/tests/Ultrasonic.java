@@ -38,6 +38,7 @@ public class Ultrasonic extends LinearOpMode {
         private final double[] history = new double[SAMPLES];
         private int count = 0;
         private int next = 0;
+        private double lastSignal = Double.NaN, lastVcc = Double.NaN;
 
         public HrlvShortRange(AnalogInput signal, AnalogInput vcc) {
             this.signal = signal;
@@ -59,15 +60,26 @@ public class Ultrasonic extends LinearOpMode {
          */
         public double getDistanceMm() {
             double supply = vcc.getVoltage();
+            lastVcc = supply;
             if (supply < 1.0) return Double.NaN;
 
-            history[next] = ratioToMm(signal.getVoltage() / supply);
+            lastSignal = signal.getVoltage();
+            history[next] = ratioToMm(lastSignal / supply);
             next = (next + 1) % SAMPLES;
             count = Math.min(count + 1, SAMPLES);
 
             double[] sorted = Arrays.copyOf(history, count);
             Arrays.sort(sorted);
             return sorted[count / 2];
+        }
+
+        // what the last getDistanceMm() read off the hub, no new read
+        public double lastSignalVoltage() {
+            return lastSignal;
+        }
+
+        public double lastVccVoltage() {
+            return lastVcc;
         }
 
         static double ratioToMm(double vOverVcc) {

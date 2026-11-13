@@ -23,16 +23,19 @@ public class CalibrationSession {
 
     static final int MAX_SAMPLES = 200000;   // about an hour at 50 Hz
     static final double MIN_LOG_GAP = 0.015;   // s, the drive loop runs much faster than we need to log
+    public static final double NOISY = 0.15;   // in, std dev of the raw readings while recording. more than this = noisy
 
     private static class Step {
         double tape;
         boolean recorded;
         double left, right, leftWobble, rightWobble;
+        double leftNoise, rightNoise;   // std dev of the readings while recording, raw inches
         int n;
     }
 
     private static class Sample {
         double t, tape, l, r, v;
+        double lSig = Double.NaN, lVcc = Double.NaN, rSig = Double.NaN, rVcc = Double.NaN;   // volts straight off the hub
         int step, attempt;
         Phase phase;
         boolean counted, corrected;
@@ -45,8 +48,8 @@ public class CalibrationSession {
         boolean fix;
     }
 
-    private static final String RAW_HEADER = "t_s,attempt,step,phase,counted,corrected,tape_in,left_in,right_in,supply_v";
-    private static final String SUMMARY_HEADER = "step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples";
+    private static final String RAW_HEADER = "t_s,attempt,step,phase,counted,corrected,tape_in,left_in,right_in,supply_v,left_sig_v,left_vcc_v,right_sig_v,right_vcc_v";
+    private static final String SUMMARY_HEADER = "step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples,left_noise_in,right_noise_in";
     private static final String FIT_HEADER = "sensor,scale,offset,r2,rmse_in,max_error_before_in,max_error_after_in,points,sensor_spacing_in,sensor_setback_in";
     private static final String TRIAL_HEADER = "trial,robot_thinks_in,tape_measured_in,error_in,result,fix_applied";
 
@@ -61,7 +64,7 @@ public class CalibrationSession {
     private int step = 0, attempt = 1;
     private double now, phaseStart, lastLog = -1;
     private double liveL = Double.NaN, liveR = Double.NaN, liveV = Double.NaN;
-    private double accL, accR, minL, maxL, minR, maxR;
+    private double accL, accR, accSqL, accSqR, minL, maxL, minR, maxR;
     private int accN;
     private String message = "";
     private double spacing, setback;
@@ -107,7 +110,8 @@ public class CalibrationSession {
     // ---------- called every loop by the opmode ----------
 
     // l and r are raw readings while calibrating, corrected ones while driving
-    public synchronized void tick(double t, double l, double r, double v, boolean driveStage) {
+    // volts = {left signal, left vcc, right signal, right vcc} as read off the hub, or null
+    public synchronized void tick(double t, double l, double r, double v, double[] volts, boolean driveStage) {
         now = t;
         liveL = l;
         liveR = r;
@@ -121,7 +125,7 @@ public class CalibrationSession {
             if (phase == Phase.SETTLING && t - phaseStart >= settleSec) {
                 phase = Phase.RECORDING;
                 phaseStart = t;
-                accL = accR = 0;
+                accL = accR = accSqL = accSqR = 0;
                 accN = 0;
                 minL = minR = 999;
                 maxL = maxR = -999;
@@ -137,6 +141,8 @@ public class CalibrationSession {
             } else {
                 accL += l;
                 accR += r;
+                accSqL += l * l;
+                accSqR += r * r;
                 minL = Math.min(minL, l);
                 maxL = Math.max(maxL, l);
                 minR = Math.min(minR, r);
@@ -160,6 +166,12 @@ public class CalibrationSession {
             s.l = l;
             s.r = r;
             s.v = v;
+            if (volts != null && volts.length >= 4) {
+                s.lSig = volts[0];
+                s.lVcc = volts[1];
+                s.rSig = volts[2];
+                s.rVcc = volts[3];
+            }
             samples.add(s);
             writeRaw(s);
         }
@@ -172,6 +184,8 @@ public class CalibrationSession {
         s.right = accR / accN;
         s.leftWobble = maxL - minL;
         s.rightWobble = maxR - minR;
+        s.leftNoise = stdDev(accL, accSqL, accN);
+        s.rightNoise = stdDev(accR, accSqR, accN);
         s.n = accN;
         s.recorded = true;
         phase = Phase.IDLE;
@@ -179,6 +193,12 @@ public class CalibrationSession {
         saveSummary();
         if (step < steps.size() - 1) step++;
         else finishCalibration();
+    }
+
+    private static double stdDev(double sum, double sumSq, int n) {
+        if (n < 2) return 0;
+        double mean = sum / n;
+        return Math.sqrt(Math.max(0, sumSq / n - mean * mean));
     }
 
     private void writeRaw(Sample s) {
@@ -362,6 +382,15 @@ public class CalibrationSession {
         return worst;
     }
 
+    // worst std dev of any recorded step, raw inches
+    public synchronized double maxNoise() {
+        double worst = 0;
+        for (Step s : steps) {
+            if (s.recorded) worst = Math.max(worst, Math.max(s.leftNoise, s.rightNoise));
+        }
+        return worst;
+    }
+
     // [left, right], from the recorded steps so far
     public synchronized Fit[] fits() {
         int n = steps.size();
@@ -449,7 +478,7 @@ public class CalibrationSession {
 
         b.append(",\"config\":{\"spacing\":").append(n(spacing)).append(",\"setback\":").append(n(setback));
         b.append(",\"stopDistance\":").append(n(stopDistance)).append(",\"tooFar\":").append(n(tooFar));
-        b.append(",\"goodEnough\":").append(n(goodEnough)).append(",\"jumpy\":").append(n(jumpy));
+        b.append(",\"goodEnough\":").append(n(goodEnough)).append(",\"jumpy\":").append(n(jumpy)).append(",\"noisy\":").append(n(NOISY));
         b.append(",\"settleSec\":").append(n(settleSec)).append(",\"recordSec\":").append(n(recordSec));
         b.append(",\"pasted\":[").append(n(pasted[0])).append(",").append(n(pasted[1])).append(",").append(n(pasted[2])).append(",").append(n(pasted[3])).append("]}");
 
@@ -460,13 +489,14 @@ public class CalibrationSession {
             b.append("{\"tape\":").append(n(s.tape)).append(",\"recorded\":").append(s.recorded);
             b.append(",\"left\":").append(n(s.left)).append(",\"right\":").append(n(s.right));
             b.append(",\"leftWobble\":").append(n(s.leftWobble)).append(",\"rightWobble\":").append(n(s.rightWobble));
+            b.append(",\"leftNoise\":").append(n(s.leftNoise)).append(",\"rightNoise\":").append(n(s.rightNoise));
             b.append(",\"n\":").append(s.n).append('}');
         }
         b.append(']');
 
         Fit[] f = fits();
         b.append(",\"fit\":{\"left\":").append(fitJson(f[0])).append(",\"right\":").append(fitJson(f[1]));
-        b.append(",\"maxWobble\":").append(n(maxWobble())).append('}');
+        b.append(",\"maxWobble\":").append(n(maxWobble())).append(",\"maxNoise\":").append(n(maxNoise())).append('}');
 
         b.append(",\"drive\":{\"active\":").append(driving).append(",\"usingFix\":").append(usingFix);
         b.append(",\"estop\":").append(estop).append(",\"result\":").append(q(driveResult)).append(",\"note\":").append(q(driveNote));
@@ -483,14 +513,15 @@ public class CalibrationSession {
         }
         b.append(']');
 
-        // sample = [index, t, step, attempt, phase, counted, corrected, tape, left, right, supply]
+        // sample = [index, t, step, attempt, phase, counted, corrected, tape, left, right, supply, lSig, lVcc, rSig, rVcc]
         b.append(",\"nextIndex\":").append(samples.size()).append(",\"samples\":[");
         for (int i = since; i < samples.size(); i++) {
             Sample s = samples.get(i);
             if (i > since) b.append(',');
             b.append('[').append(i).append(',').append(n(s.t)).append(',').append(s.step).append(',').append(s.attempt);
             b.append(',').append(s.phase.ordinal()).append(',').append(s.counted ? 1 : 0).append(',').append(s.corrected ? 1 : 0);
-            b.append(',').append(n(s.tape)).append(',').append(n(s.l)).append(',').append(n(s.r)).append(',').append(n(s.v)).append(']');
+            b.append(',').append(n(s.tape)).append(',').append(n(s.l)).append(',').append(n(s.r)).append(',').append(n(s.v));
+            b.append(',').append(n(s.lSig)).append(',').append(n(s.lVcc)).append(',').append(n(s.rSig)).append(',').append(n(s.rVcc)).append(']');
         }
         b.append("]}");
         return b.toString();
@@ -511,7 +542,8 @@ public class CalibrationSession {
 
     private static String rawRow(Sample s) {
         return c(s.t) + "," + s.attempt + "," + (s.step + 1) + "," + s.phase.name() + "," + (s.counted ? 1 : 0) + ","
-                + (s.corrected ? 1 : 0) + "," + c(s.tape) + "," + c(s.l) + "," + c(s.r) + "," + c(s.v);
+                + (s.corrected ? 1 : 0) + "," + c(s.tape) + "," + c(s.l) + "," + c(s.r) + "," + c(s.v)
+                + "," + c(s.lSig) + "," + c(s.lVcc) + "," + c(s.rSig) + "," + c(s.rVcc);
     }
 
     public synchronized String rawCsv() {
@@ -527,7 +559,8 @@ public class CalibrationSession {
             if (!s.recorded) continue;
             b.append(i + 1).append(',').append(c(s.tape)).append(',').append(c(s.left)).append(',').append(c(s.right)).append(',')
                     .append(c(s.leftWobble)).append(',').append(c(s.rightWobble)).append(',')
-                    .append(c(s.left - s.tape)).append(',').append(c(s.right - s.tape)).append(',').append(s.n).append('\n');
+                    .append(c(s.left - s.tape)).append(',').append(c(s.right - s.tape)).append(',').append(s.n).append(',')
+                    .append(c(s.leftNoise)).append(',').append(c(s.rightNoise)).append('\n');
         }
         return b.toString();
     }
