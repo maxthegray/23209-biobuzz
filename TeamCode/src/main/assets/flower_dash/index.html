@@ -61,6 +61,7 @@ canvas{width:100%;height:280px;display:block}
   <h1>Flower approach: ultrasonic calibration</h1>
   <span class="pill" id="conn">connecting...</span>
   <span class="pill" id="started">Driver Hub: INIT</span>
+  <span class="pill" id="fixPill">-</span>
   <span class="pill" id="samples">0 samples</span>
 </header>
 <div id="banner">Robot unreachable, retrying. Your data is kept on this page and on the robot.</div>
@@ -150,11 +151,11 @@ canvas{width:100%;height:280px;display:block}
     <h2>Reading vs tape, best line of fit</h2>
     <div class="legend" id="legB"></div>
     <div class="chart"><canvas id="chB"></canvas><div class="tip"></div></div>
-    <p class="mute">Dashed grey line = perfect sensor. Each coloured line is the least-squares fit: tape = scale &times; reading + offset.</p>
+    <p class="mute">Dashed grey line = perfect sensor. If the fix is right the dots sit on it and the fit says about 1 &times; reading + 0.</p>
   </div>
   <div class="card">
     <h2>Misses (inches off the tape)</h2>
-    <div class="legend"><span><i style="background:var(--left)"></i>left</span><span><i style="background:var(--right)"></i>right</span><span>filled = before fix, hollow = after fix, band = good enough</span></div>
+    <div class="legend"><span><i style="background:var(--left)"></i>left</span><span><i style="background:var(--right)"></i>right</span><span>band = good enough</span></div>
     <div class="chart"><canvas id="chC"></canvas><div class="tip"></div></div>
   </div>
 </section>
@@ -168,6 +169,13 @@ let S=null;                 // latest state from the robot
 let samples=[];             // [idx,t,step,attempt,phase,counted,corrected,tape,l,r,v]
 let sessionId=null, nextIndex=0, connected=false, lastOk=0, windowSec=30, paused=false, geoInit=false, tapesInit="";
 let hover={};
+// the fix pasted in WallApproach, as [leftScale, leftOffset, rightScale, rightOffset]
+function codeFix(){return S&&S.config&&S.config.pasted?S.config.pasted:[1,0,1,0]}
+function withFix(k,side,v){return v==null?null:side==="left"?k[0]*v+k[1]:k[2]*v+k[3]}
+function noFixYet(k){return k[0]===1&&k[1]===0&&k[2]===1&&k[3]===0}
+// the robot records raw (the fix gets worked out from raw), the page only ever shows them fixed
+function fixedSteps(){const k=codeFix();return recordedSteps().map(s=>({tape:s.tape,left:withFix(k,"left",s.left),right:withFix(k,"right",s.right),
+  leftWobble:s.leftWobble*Math.abs(k[0]),rightWobble:s.rightWobble*Math.abs(k[2])}))}
 
 // ---------- save a copy in this browser ----------
 function saveLocal(){
@@ -228,8 +236,12 @@ function render(){
   $("started").className="pill "+(S.started?"ok":"");
   $("samples").textContent=samples.length+" samples";
   if(S.message)toast(S.message);
-  for(const id of ["l0","l1","l3"])$(id).textContent=f2(S.live.left);
-  for(const id of ["r0","r1","r3"])$(id).textContent=f2(S.live.right);
+  const kl=codeFix(),rawLive=S.stage!=="DRIVE";   // while driving the live numbers already have the fix in them
+  const liveL=rawLive?withFix(kl,"left",S.live.left):S.live.left,liveR=rawLive?withFix(kl,"right",S.live.right):S.live.right;
+  for(const id of ["l0","l1","l3"])$(id).textContent=f2(liveL);
+  for(const id of ["r0","r1","r3"])$(id).textContent=f2(liveR);
+  $("fixPill").textContent=noFixYet(kl)?"no fix in the code yet":`fixed readings: L ${kl[0]}×+${kl[1]}, R ${kl[2]}×+${kl[3]}`;
+  $("fixPill").className="pill "+(noFixYet(kl)?"err":"ok");
   $("v0").textContent=S.live.supply==null?"-":f2(S.live.supply)+" V";
   const okL=S.live.left!=null&&S.live.right!=null&&S.live.left>=1&&S.live.right>=1;
   $("sensorOk").innerHTML=okL?"<span class='good'>Both sensors reading.</span>"+(S.live.supply<3.0||S.live.supply>3.6?" <span class='warn'>Supply should be about 3.3 V.</span>":""):"<span class='bad'>A sensor isn't reading. Check wiring (a reading under 1 in is a loose signal wire).</span>";
@@ -258,18 +270,23 @@ function render(){
     const tr=tb.insertRow();if(i===S.step&&cal)tr.className="cur";
     tr.style.cursor="pointer";tr.onclick=()=>{if(cal&&idle)post("GOTO_STEP",{step:i})};
     tr.insertCell().textContent=s.tape+" in";
-    tr.insertCell().textContent=s.recorded?f2(s.left):"-";
-    tr.insertCell().textContent=s.recorded?f2(s.right):"-";
-    tr.insertCell().textContent=s.recorded?f2(s.leftWobble)+" / "+f2(s.rightWobble):"-";
+    const k=codeFix();
+    tr.insertCell().textContent=s.recorded?f2(withFix(k,"left",s.left)):"-";
+    tr.insertCell().textContent=s.recorded?f2(withFix(k,"right",s.right)):"-";
+    tr.insertCell().textContent=s.recorded?f2(s.leftWobble*Math.abs(k[0]))+" / "+f2(s.rightWobble*Math.abs(k[2])):"-";
   });
+  const fs=fixedSteps();
   $("wobbleWarn").textContent=S.fit.maxWobble>c.jumpy?"Readings wobble a lot (over "+c.jumpy+" in). Unplug one sensor: if the other calms down they're hearing each other. If not, put a 100uF capacitor across the sensor's V+ and GND.":"";
 
   // step 2
   const L=S.fit.left,R=S.fit.right;
-  const vc=f=>f.points<3?"warn":f.worstBefore<=c.goodEnough||f.worstAfter<=c.goodEnough?"good":"bad";
-  $("verdicts").innerHTML=`<div class="verdict ${vc(L)}"><b>Left:</b> ${L.verdict}</div><div class="verdict ${vc(R)}"><b>Right:</b> ${R.verdict}</div>`;
-  const need=L.points>=3&&(L.worstBefore>c.goodEnough||R.worstBefore>c.goodEnough);
-  $("paste").innerHTML=need?`<p>Paste into <code>WallApproach</code> in FlowerApproachTest.java:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
+  const wl=fs.length?Math.max(...fs.map(s=>Math.abs(s.left-s.tape))):0,wr=fs.length?Math.max(...fs.map(s=>Math.abs(s.right-s.tape))):0;
+  const say=(name,w)=>fs.length<3?`<div class="verdict warn"><b>${name}:</b> record at least 3 distances</div>`
+    :`<div class="verdict ${w<=c.goodEnough?"good":"bad"}"><b>${name}:</b> worst ${f2(w)} in off ${w<=c.goodEnough?"&mdash; good":"&mdash; record again, or update the fix below"}</div>`;
+  $("verdicts").innerHTML=say("Left",wl)+say("Right",wr);
+  const kc=codeFix(),differs=Math.abs(L.scale-kc[0])>0.005||Math.abs(L.offset-kc[1])>0.02||Math.abs(R.scale-kc[2])>0.005||Math.abs(R.offset-kc[3])>0.02;
+  const need=fs.length>=3&&L.points>=3&&Math.max(wl,wr)>c.goodEnough&&differs;   // no point telling you to paste what's already there
+  $("paste").innerHTML=need?`<p>Update the fix in <code>WallApproach</code> (FlowerApproachTest.java) to:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
   if($("copy"))$("copy").onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($("pasteTxt").textContent);
   $("goFix").disabled=!(stg==="RESULTS"&&L.sane&&R.sane);$("goNoFix").disabled=stg!=="RESULTS";$("restart2").disabled=stg!=="RESULTS";
 
@@ -322,12 +339,18 @@ function rawCsv(){
   for(const s of samples)o+=[fx(s[1]),s[3],s[2]+1,PHASES[s[4]],s[5],s[6],fx(s[7]),fx(s[8]),fx(s[9]),fx(s[10])].join(",")+"\n";
   return o}
 function summaryCsv(){
-  let o="step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples\n";
-  if(S)S.steps.forEach((s,i)=>{if(s.recorded)o+=[i+1,fx(s.tape),fx(s.left),fx(s.right),fx(s.leftWobble),fx(s.rightWobble),fx(s.left-s.tape),fx(s.right-s.tape),s.n].join(",")+"\n"});
+  let o="step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples,left_with_code_fix_in,right_with_code_fix_in,left_fixed_error_in,right_fixed_error_in\n";
+  const k=codeFix();
+  if(S)S.steps.forEach((s,i)=>{if(s.recorded){const fl=withFix(k,"left",s.left),fr=withFix(k,"right",s.right);
+    o+=[i+1,fx(s.tape),fx(s.left),fx(s.right),fx(s.leftWobble),fx(s.rightWobble),fx(s.left-s.tape),fx(s.right-s.tape),s.n,fx(fl),fx(fr),fx(fl-s.tape),fx(fr-s.tape)].join(",")+"\n"}});
   return o}
 function fitCsv(){
   let o="sensor,scale,offset,r2,rmse_in,max_error_before_in,max_error_after_in,points,sensor_spacing_in,sensor_setback_in\n";
   if(S)for(const k of ["left","right"]){const f=S.fit[k];o+=[k,fx(f.scale),fx(f.offset),fx(f.r2),fx(f.rmse),fx(f.worstBefore),fx(f.worstAfter),f.points,fx(S.config.spacing),fx(S.config.setback)].join(",")+"\n"}
+  // the fix that's pasted in the code, and how far off the recorded points are with it
+  if(S){const kp=codeFix(),st=recordedSteps();for(const [k,si] of [["left",0],["right",2]]){
+    let worstRaw=0,worstFix=0,sq=0;for(const s of st){const raw=s[k],fixd=withFix(kp,k,raw);worstRaw=Math.max(worstRaw,Math.abs(raw-s.tape));worstFix=Math.max(worstFix,Math.abs(fixd-s.tape));sq+=(fixd-s.tape)**2}
+    o+=[k+"_code_fix",fx(kp[si]),fx(kp[si+1]),"",fx(st.length?Math.sqrt(sq/st.length):null),fx(worstRaw),fx(worstFix),st.length,fx(S.config.spacing),fx(S.config.setback)].join(",")+"\n"}}
   return o}
 function trialsCsv(){
   let o="trial,robot_thinks_in,tape_measured_in,error_in,result,fix_applied\n";
@@ -378,6 +401,7 @@ function drawA(){
   const view=paused?(drawA.frozen||(drawA.frozen=tEnd)):(drawA.frozen=null,tEnd);
   const t0=windowSec?view-windowSec:data[0][1],t1=Math.max(view,t0+1);
   let vis=data.filter(s=>s[1]>=t0&&s[1]<=t1);
+  {const k=codeFix();vis=vis.map(s=>s[6]?s:s.slice(0,8).concat([withFix(k,"left",s[8]),withFix(k,"right",s[9]),s[10]]))}   // drive samples already have it
   let ymin=1e9,ymax=-1e9;
   for(const s of vis)for(const v of [s[8],s[9],s[7]])if(v!=null){ymin=Math.min(ymin,v);ymax=Math.max(ymax,v)}
   if(ymin>ymax){ymin=0;ymax=10}
@@ -406,40 +430,39 @@ function drawA(){
 
 function drawB(){
   const cv=$("chB"),c=setup(cv),{g}=c;hover.B=[];
-  const st=recordedSteps();let lo=0,hi=10;
-  if(st.length){hi=Math.max(...st.map(s=>Math.max(s.tape,s.left,s.right)))*1.1+1}
+  const k=codeFix(),st=recordedSteps();let hi=10;
+  if(st.length){hi=Math.max(...st.map(s=>Math.max(s.tape,withFix(k,"left",s.left),withFix(k,"right",s.right))))*1.1+1}
   const{X,Y}=axes(c,0,hi,0,hi,"sensor reading (in)","tape distance (in)");
   g.save();g.setLineDash([6,5]);g.strokeStyle=css("--mute");g.beginPath();g.moveTo(X(0),Y(0));g.lineTo(X(hi),Y(hi));g.stroke();g.restore();
   const leg=[];
-  for(const [k,col,name] of [["left","--left","Left"],["right","--right","Right"]]){
-    const color=css(col),pts=st.map(s=>[s[k],s.tape,s[k+"Wobble"]]);
+  if(noFixYet(k))leg.push(`<span class="warn">No fix pasted in the code yet (scale 1, offset 0), so this matches the raw chart.</span>`);
+  for(const [key,col,name,si] of [["left","--left","Left",0],["right","--right","Right",2]]){
+    const color=css(col),pts=st.map(s=>[withFix(k,key,s[key]),s.tape,s[key+"Wobble"]*Math.abs(k[si])]);
     const fit=fitOf(pts);
     if(pts.length>=2){g.strokeStyle=color;g.lineWidth=2;g.beginPath();
-      // tape = scale*reading + offset, so reading = (tape - offset)/scale
       const r0=(0-fit.offset)/fit.scale,r1=(hi-fit.offset)/fit.scale;g.moveTo(X(r0),Y(0));g.lineTo(X(r1),Y(hi));g.stroke()}
-    for(const [r,t,wob] of pts){const x=X(r),y=Y(t);
+    let worst=0,sq=0;
+    for(const [r,t,wob] of pts){const x=X(r),y=Y(t);worst=Math.max(worst,Math.abs(r-t));sq+=(r-t)*(r-t);
       g.strokeStyle=color;g.lineWidth=1.2;g.beginPath();g.moveTo(x-wob/2*(X(1)-X(0)),y);g.lineTo(x+wob/2*(X(1)-X(0)),y);g.stroke();
       g.fillStyle=color;g.beginPath();g.arc(x,y,4.5,0,7);g.fill();
-      hover.B.push({x,y,text:`${name}: read ${f2(r)} / tape ${t} (wobble ${f2(wob)})`})}
-    const F=S&&S.fit[k];
-    if(pts.length>=2&&F)leg.push(`<span><i style="background:${color}"></i>${name}: tape = ${F.scale.toFixed(4)} &times; reading ${F.offset<0?"-":"+"} ${Math.abs(F.offset).toFixed(3)} &nbsp; R&sup2; ${F.r2.toFixed(5)}, rmse ${F.rmse.toFixed(3)} in${Math.abs(F.scale-fit.scale)>1e-6||Math.abs(F.offset-fit.offset)>1e-6?" <b class='bad'>(page and robot fits disagree!)</b>":""}</span>`);
-    else leg.push(`<span><i style="background:${color}"></i>${name}: record at least 2 distances for a fit</span>`)}
+      hover.B.push({x,y,text:`${name}: with fix ${f2(r)} / tape ${t} (${f2(r-t)} off)`})}
+    if(pts.length>=2)leg.push(`<span><i style="background:${color}"></i>${name}: fit = ${fit.scale.toFixed(3)} &times; reading ${fit.offset<0?"-":"+"} ${Math.abs(fit.offset).toFixed(2)} &nbsp; worst ${f2(worst)} in, rmse ${f2(Math.sqrt(sq/pts.length))} in</span>`);
+    else leg.push(`<span><i style="background:${color}"></i>${name}: record at least 2 distances</span>`)}
   $("legB").innerHTML=leg.join("");
   addTip(cv,"B")}
 
 function drawC(){
   const cv=$("chC"),c=setup(cv),{g}=c;hover.C=[];
-  const st=recordedSteps(),ge=S?S.config.goodEnough:.25;
+  const st=fixedSteps(),ge=S?S.config.goodEnough:.25;
   let m=ge*2;for(const s of st)m=Math.max(m,Math.abs(s.left-s.tape),Math.abs(s.right-s.tape));m*=1.15;
   const tmax=st.length?Math.max(...st.map(s=>s.tape))*1.1+1:10;
   const{X,Y}=axes(c,0,tmax,-m,m,"tape distance (in)","reading minus tape (in)");
   g.fillStyle=css("--band");g.fillRect(X(0),Y(ge),X(tmax)-X(0),Y(-ge)-Y(ge));
   g.strokeStyle=css("--mute");g.beginPath();g.moveTo(X(0),Y(0));g.lineTo(X(tmax),Y(0));g.stroke();
   for(const [k,col,name] of [["left","--left","Left"],["right","--right","Right"]]){
-    const color=css(col),pts=st.map(s=>[s[k],s.tape]),fit=fitOf(pts);
-    for(const [r,t] of pts){
-      let x=X(t),y=Y(r-t);g.fillStyle=color;g.beginPath();g.arc(x,y,4.5,0,7);g.fill();hover.C.push({x,y,text:`${name} before fix: ${f2(r-t)} in off at ${t}`});
-      if(pts.length>=2){y=Y(fit.scale*r+fit.offset-t);g.strokeStyle=color;g.lineWidth=2;g.beginPath();g.arc(x,y,5.5,0,7);g.stroke();hover.C.push({x,y,text:`${name} after fix: ${f2(fit.scale*r+fit.offset-t)} in off at ${t}`})}}}
+    const color=css(col);
+    for(const s of st){const x=X(s.tape),y=Y(s[k]-s.tape);g.fillStyle=color;g.beginPath();g.arc(x,y,4.5,0,7);g.fill();
+      hover.C.push({x,y,text:`${name}: ${f2(s[k]-s.tape)} in off at ${s.tape}`})}}
   addTip(cv,"C")}
 
 let pending=false;
