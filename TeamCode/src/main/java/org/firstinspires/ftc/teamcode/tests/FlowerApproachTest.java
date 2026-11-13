@@ -33,8 +33,8 @@ public class FlowerApproachTest extends LinearOpMode {
     private static final double[] tapeDistances = {4, 6, 8, 12, 18, 24};   // in, sensor face to object. extra points near where flowers stop
     private static final double settleSec = 1.0;   // datasheet: the output goes through a 2 Hz filter, so give it time to catch up
     private static final double recordSec = 1.5;
-    private static final double goodEnough = 0.25;   // in, worst miss we still call accurate
-    private static final double jumpy = 0.3;   // in, readings wobbling more than this while still = something's wrong
+    private static final double goodEnough = 0.4;   // in. the datasheet says the analog output is only within +-10 mm (0.39 in)
+    private static final double jumpy = 0.5;   // in. the analog output moves in 6 mm (0.24 in) steps, so 1-2 steps of wobble is normal
     private static final double tooFar = 30;   // in, won't drive unless both sensors see something closer than this
     private static final double deadManSec = 0.4;   // website drive button must keep pinging, no ping for this long = stop
 
@@ -57,6 +57,7 @@ public class FlowerApproachTest extends LinearOpMode {
         approach = new WallApproach(hardwareMap);
         session = new CalibrationSession(tapeDistances, settleSec, recordSec, goodEnough, jumpy,
                 WallApproach.stopDistance, tooFar, WallApproach.defaultSpacing, WallApproach.defaultSetback);
+        session.setPastedFix(WallApproach.pastedFix());
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         CalibrationServer server = CalibrationServer.startOnFreePort(hardwareMap.appContext, session, commands);
@@ -153,7 +154,7 @@ public class FlowerApproachTest extends LinearOpMode {
             case "GO_DRIVE": {
                 boolean sane = session.fitsSane();
                 usingFix = c.args.optBoolean("fix", true) && sane;
-                double[] k = usingFix ? session.correction() : new double[]{1, 0, 1, 0};
+                double[] k = usingFix ? session.correction() : WallApproach.pastedFix();   // not this run's fix = keep the one pasted in the code
                 approach.useCorrection(k[0], k[1], k[2], k[3]);
                 result = null;
                 driveNote = "";
@@ -219,7 +220,8 @@ public class FlowerApproachTest extends LinearOpMode {
         String m = session.message();
         if (!m.isEmpty()) telemetry.addLine(m);
         telemetry.addLine("");
-        telemetry.addLine(String.format("Live  left %5.2f in   right %5.2f in", cachedLeft, cachedRight));
+        double[] k = WallApproach.pastedFix();
+        telemetry.addLine(String.format("Live  left %5.2f in   right %5.2f in", k[0] * cachedLeft + k[1], k[2] * cachedRight + k[3]));
         telemetry.addLine(String.format("Sensor supply %.2f V (should be about 3.3)", approach.supplyVolts()));
         telemetry.addLine("");
         telemetry.addLine("A = record   B = redo last step   X = done, show results");
@@ -235,14 +237,18 @@ public class FlowerApproachTest extends LinearOpMode {
             telemetry.addLine("A = drive check with no fix   B = redo formula check");
             return;
         }
-        telemetry.addLine("Left:  " + leftFit.verdict());
-        telemetry.addLine("Right: " + rightFit.verdict());
+        double[] k = WallApproach.pastedFix();
+        double[] worst = session.worstWithFix(k);
+        telemetry.addLine(String.format("Left:  worst %.2f in off %s", worst[0], worst[0] <= goodEnough ? "- good" : "- record again"));
+        telemetry.addLine(String.format("Right: worst %.2f in off %s", worst[1], worst[1] <= goodEnough ? "- good" : "- record again"));
         if (session.maxWobble() > jumpy) {
             telemetry.addLine("Readings wobble a lot. Unplug one sensor, if the other calms down they hear each other");
             telemetry.addLine("If not, datasheet says put a 100uF capacitor across the sensor's V+ and GND");
         }
-        if (leftFit.worstBefore > goodEnough || rightFit.worstBefore > goodEnough) {
-            telemetry.addLine("Paste into WallApproach in FlowerApproachTest.java:");
+        boolean differs = Math.abs(leftFit.scale - k[0]) > 0.005 || Math.abs(leftFit.offset - k[1]) > 0.02
+                || Math.abs(rightFit.scale - k[2]) > 0.005 || Math.abs(rightFit.offset - k[3]) > 0.02;
+        if (Math.max(worst[0], worst[1]) > goodEnough && differs) {
+            telemetry.addLine("Update the fix in WallApproach (FlowerApproachTest.java) to:");
             telemetry.addLine(String.format("  leftScale = %.4f, leftOffset = %.3f", leftFit.scale, leftFit.offset));
             telemetry.addLine(String.format("  rightScale = %.4f, rightOffset = %.3f", rightFit.scale, rightFit.offset));
         }
@@ -280,7 +286,7 @@ public class FlowerApproachTest extends LinearOpMode {
     }
 
     private void drive(boolean canDrive) {
-        telemetry.addLine("DRIVE CHECK" + (usingFix ? " (using this run's fix)" : " (no fix applied)"));
+        telemetry.addLine("DRIVE CHECK" + (usingFix ? " (using this run's fix)" : " (using the fix pasted in the code)"));
         if (!canDrive) {
             telemetry.addLine("Press START on the Driver Hub to drive");
             telemetry.addLine("B = back to results");
@@ -348,9 +354,9 @@ public class FlowerApproachTest extends LinearOpMode {
             return String.format("%.2f in off even with the fix, check the object/wiring and redo", worstAfter);
         }
 
-        // a real sensor won't need more than this, bigger means the data's bad
+        // judged on how well the points sit on a line, not how big the fix is. ours really is ~23% and that's fine
         public boolean sane() {
-            return points >= 3 && Math.abs(scale - 1) < 0.15 && Math.abs(offset) < 3;
+            return points >= 3 && r2 > 0.99 && rmse < 0.5 && scale > 0.5 && scale < 2 && Math.abs(offset) < 6;
         }
     }
 
@@ -360,7 +366,7 @@ public class FlowerApproachTest extends LinearOpMode {
 
         public enum Result { RUNNING, DONE, FAILED }
 
-        public static final double defaultSpacing = 16.0;   // in, center to center. measure this (the website can change it for a run)
+        public static final double defaultSpacing = 7.5;   // in, center to center, measured 2026-11-09 (the website can change it for a run)
         public static final double defaultSetback = 0.0;   // in, how far the sensors sit behind the bumper. measure this
         private double sensorSpacing = defaultSpacing;
         private double sensorSetback = defaultSetback;
@@ -392,6 +398,10 @@ public class FlowerApproachTest extends LinearOpMode {
         // paste the numbers from this test's results screen here. corrected = scale * reading + offset
         public static final double leftScale = 1.2319, leftOffset = 2.144;
         public static final double rightScale = 1.2270, rightOffset = 2.487;
+
+        public static double[] pastedFix() {
+            return new double[]{leftScale, leftOffset, rightScale, rightOffset};
+        }
         private double leftScaleNow = leftScale, leftOffsetNow = leftOffset;
         private double rightScaleNow = rightScale, rightOffsetNow = rightOffset;
         static final double minReading = 1.0;   // in. under this is a loose signal wire (it reads as 0.8), not a real wall

@@ -65,6 +65,7 @@ public class CalibrationSession {
     private int accN;
     private String message = "";
     private double spacing, setback;
+    private double[] pasted = {1, 0, 1, 0};
     private boolean started, usingFix, estop;
     private double[] fixNow = {1, 0, 1, 0};
 
@@ -381,6 +382,22 @@ public class CalibrationSession {
         return f[0].sane() && f[1].sane();
     }
 
+    // the fix that's pasted in the code right now, so the screens can show it working
+    public synchronized void setPastedFix(double[] k) {
+        pasted = k.clone();
+    }
+
+    // worst miss of the recorded raw readings once the given fix is applied, [left, right]
+    public synchronized double[] worstWithFix(double[] k) {
+        double worstL = 0, worstR = 0;
+        for (Step s : steps) {
+            if (!s.recorded) continue;
+            worstL = Math.max(worstL, Math.abs(k[0] * s.left + k[1] - s.tape));
+            worstR = Math.max(worstR, Math.abs(k[2] * s.right + k[3] - s.tape));
+        }
+        return new double[]{worstL, worstR};
+    }
+
     // scale/offset pairs for WallApproach.useCorrection
     public synchronized double[] correction() {
         Fit[] f = fits();
@@ -433,7 +450,8 @@ public class CalibrationSession {
         b.append(",\"config\":{\"spacing\":").append(n(spacing)).append(",\"setback\":").append(n(setback));
         b.append(",\"stopDistance\":").append(n(stopDistance)).append(",\"tooFar\":").append(n(tooFar));
         b.append(",\"goodEnough\":").append(n(goodEnough)).append(",\"jumpy\":").append(n(jumpy));
-        b.append(",\"settleSec\":").append(n(settleSec)).append(",\"recordSec\":").append(n(recordSec)).append("}");
+        b.append(",\"settleSec\":").append(n(settleSec)).append(",\"recordSec\":").append(n(recordSec));
+        b.append(",\"pasted\":[").append(n(pasted[0])).append(",").append(n(pasted[1])).append(",").append(n(pasted[2])).append(",").append(n(pasted[3])).append("]}");
 
         b.append(",\"steps\":[");
         for (int i = 0; i < steps.size(); i++) {
