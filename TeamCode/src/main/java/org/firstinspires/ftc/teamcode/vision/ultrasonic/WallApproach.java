@@ -46,7 +46,7 @@ public class WallApproach {
     static final double distanceTolerance = 0.5;
     static final double angleTolerance = 2.0;
     static final double strafeTolerance = 0.75;
-    static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower
+    static final double maxSkew = 2.5;   // in. 7.5 in apart, so 2.5 in is already ~18 deg crooked. more = a sensor is seeing the flower
     static final double timeoutSec = 6.0;
 
     // TUNED: paste the numbers from the Flower Approach Test results here. corrected = scale * reading + offset

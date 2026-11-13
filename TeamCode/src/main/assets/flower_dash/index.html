@@ -96,6 +96,7 @@ canvas{width:100%;height:280px;display:block}
       <button id="cancel">Cancel</button>
       <button id="redo">Back one step</button>
       <button id="done">Done, show results</button>
+      <button class="primary" id="skipDrive">Skip measuring, go to drive check</button>
       <button id="restart">Start over</button>
     </div>
     <table id="stepTable"><thead><tr><th>tape</th><th>left</th><th>right</th><th>wobble L/R</th></tr></thead><tbody></tbody></table>
@@ -110,7 +111,7 @@ canvas{width:100%;height:280px;display:block}
     <div id="paste"></div>
     <div class="row">
       <button class="primary" id="goFix">Drive check WITH fix</button>
-      <button id="goNoFix">Drive check, no fix</button>
+      <button id="goNoFix">Drive check with the tuned numbers</button>
       <button id="restart2">Redo formula check</button>
     </div>
   </div>
@@ -263,7 +264,7 @@ function render(){
   $("phaseTxt").textContent=S.phase==="SETTLING"?"Settling... let the sensor's filter catch up":S.phase==="RECORDING"?"Recording...":"";
   const cal=stg==="CALIBRATE";
   $("rec").disabled=!(cal&&idle);$("rec").textContent=S.phase==="IDLE"?"Record "+tape+" in":"Recording...";
-  $("cancel").disabled=idle||!cal;$("redo").disabled=!(cal&&idle&&S.step>0);$("done").disabled=!(cal&&idle);
+  $("cancel").disabled=idle||!cal;$("redo").disabled=!(cal&&idle&&S.step>0);$("done").disabled=!(cal&&idle);$("skipDrive").disabled=!(stg!=="DRIVE"&&idle);
   $("restart").disabled=stg==="DRIVE";$("setTapes").disabled=!(cal&&idle);
   const tb=$("stepTable").tBodies[0];tb.innerHTML="";
   S.steps.forEach((s,i)=>{
@@ -311,6 +312,7 @@ function render(){
 $("sendGeo").onclick=()=>post("SET_GEOMETRY",{spacing:parseFloat($("spacing").value),setback:parseFloat($("setback").value)});
 $("rec").onclick=()=>post("RECORD");$("cancel").onclick=()=>post("CANCEL");$("redo").onclick=()=>post("REDO");
 $("done").onclick=()=>post("DONE");
+$("skipDrive").onclick=()=>post("SKIP_DRIVE");
 $("restart").onclick=$("restart2").onclick=()=>{if(confirm("Throw away this run's formula-check results and start over? (The raw samples stay in the log.)"))post("RESTART")};
 $("setTapes").onclick=()=>{const t=$("tapes").value.split(/[\s,]+/).map(parseFloat).filter(x=>x>0&&isFinite(x));if(t.length){tapesInit="";post("SET_TAPES",{tapes:t})}else toast("Enter some distances like 4, 6, 8, 12")};
 $("goFix").onclick=()=>post("GO_DRIVE",{fix:true});$("goNoFix").onclick=()=>post("GO_DRIVE",{fix:false});

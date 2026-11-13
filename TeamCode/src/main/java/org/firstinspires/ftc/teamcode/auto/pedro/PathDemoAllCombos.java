@@ -37,24 +37,30 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double fieldSize = 141.5;
     private static final double hiveX = 58;   // middle of the red hive
 
-    private static final Pose startPose = pose(hiveX, 9, 90);
-    private static final Pose audienceShootPose = pose(hiveX, 14, 90);   // 5 in off the wall so it doesn't scrape
+    // the robot is 40 x 40 cm (15.75 in), pinpoint in the middle, so the center is 7.875 in from each edge
+    private static final double halfRobot = 7.875;
+
+    private static final Pose startPose = pose(hiveX, halfRobot, 90);   // back flush against the wall
+    private static final Pose audienceShootPose = pose(hiveX, 5 + halfRobot, 90);   // 5 in off the wall so it doesn't scrape
     private static final Pose rearShootPose = pose(hiveX, 116, -90);
 
     private static final Pose gardenTurnSpot = new Pose(36, 30);   // spin around out here, nowhere near a wall
-    private static final Pose gardenLineup = pose(15, 24, -90);   // a bit right of the pickup so it can't slide into the wall
-    private static final Pose gardenPickup = pose(12, 12, -90);
+    private static final Pose gardenLineup = pose(6 + halfRobot, 24, -90);   // 6 in off the side wall so it can't slide into it
+    private static final Pose gardenPickup = pose(3 + halfRobot, 3 + halfRobot, -90);   // 3 in off both walls
     private static final Pose gardenBackup = pose(22, 24, -90);
     private static final Pose swoopControl = new Pose(22, 116);
 
-    private static final Pose sideFlowerLineup = pose(24.4, 46.75, 180);
-    private static final Pose sideFlowerPickup = pose(16.4, 46.75, 180);
-    private static final Pose rearFlowerLineup = pose(48, 118, 90);
-    private static final Pose rearFlowerPickup = pose(48, 125.1, 90);
+    // flowers sit at 46.75 along their wall (manual). the sensors are only 7.5 in apart and a flower is ~6.3 in wide,
+    // so being even an inch off center puts a sensor on the flower
+    private static final double flowerCenter = 46.75;
+    private static final Pose sideFlowerLineup = pose(15.4 + halfRobot, flowerCenter, 180);   // bumper 15.4 in off the wall
+    private static final Pose sideFlowerPickup = pose(7.4 + halfRobot, flowerCenter, 180);   // bumper 7.4 in off, the ultrasonics do the last inch
+    private static final Pose rearFlowerLineup = pose(flowerCenter, fieldSize - 14.5 - halfRobot, 90);   // bumper 14.5 in off the wall
+    private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - 7.4 - halfRobot, 90);
     private static final Pose climbControl1 = new Pose(18, 14);
     private static final Pose climbControl2 = new Pose(18, 118);
 
-    private static final Pose parkPose = pose(13, 108, -90);
+    private static final Pose parkPose = pose(4 + halfRobot, 108, -90);   // 4 in off the side wall
     private static final Pose parkWaypoint = new Pose(24, 40);   // straight line from down here would hit the hive or the side flower
 
     private static final double autoLength = 30;
@@ -70,7 +76,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double nominalVoltage = 12.0;   // every path drives like it's on a 12 V battery
     private static final double lowBattery = 12.5;   // resting voltage under this, swap it before the run
 
-    private static final double bumperToCenter = 9.0;   // half the robot length, measure it
+    private static final double bumperToCenter = halfRobot;
     private static final boolean fixPoseAtWall = false;   // true = let the wall reading correct pedro's position after the adjust
     private static final double maxPoseFix = 4.0;   // ultrasonics disagree with pedro by more than this = don't trust them
     private static final double maxAdjust = 3.0;   // the adjust can't take it further than this from pedro's pickup spot

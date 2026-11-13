@@ -27,7 +27,7 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
     static final double tolerance = 0.3;   // in, close enough to call it the same
     static final double settleSec = 0.3;   // sensors update every 100 ms, wait for a few fresh readings
     static final double timeoutSec = 8.0;   // give up if it still isn't aligned after this long
-    static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower, not the wall
+    static final double maxSkew = 2.5;   // in. 7.5 in apart, so 2.5 in is already ~18 deg crooked. more = a sensor is seeing the flower
     static final double minReading = 1.0;   // in, under this is a loose signal wire
     static final double maxReading = 30.0;   // in, farther than this the wall probably isn't in front of both sensors
 

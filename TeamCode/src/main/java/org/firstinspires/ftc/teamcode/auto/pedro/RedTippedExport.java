@@ -25,7 +25,7 @@ public class RedTippedExport extends LinearOpMode {
 
     private final PoseFactory poseFactory = PoseFactory.degrees();
 
-    private final Pose redtippedstart = poseFactory.of(58, 9, 90);
+    private final Pose redtippedstart = poseFactory.of(58, 7.875, 90);
     private final Pose point11turnforgarden = poseFactory.of(36, 30, -90);
     private final Pose point11turnforgardenSegment1Heading = poseFactory.of(36, 30, 90);
     private final Pose point11turnforgardenSegment2Start = poseFactory.of(36, 30, 90);
@@ -33,27 +33,27 @@ public class RedTippedExport extends LinearOpMode {
     private final Pose point11turnforgardenSegment3Start = poseFactory.of(36, 30, 180);
     private final Pose point11turnforgardenSegment3End = poseFactory.of(36, 30, 270);
     private final Pose point11turnforgardenSegment4Heading = poseFactory.of(36, 30, -90);
-    private final Pose point22togarden = poseFactory.of(15, 24, -90);
-    private final Pose point33grabgarden = poseFactory.of(12, 12, -90);
+    private final Pose point22togarden = poseFactory.of(13.875, 24, -90);
+    private final Pose point33grabgarden = poseFactory.of(10.875, 10.875, -90);
     private final Pose point44backoffgarden = poseFactory.of(22, 24, -90);
     private final Pose point55swooproundthehive = poseFactory.of(58, 116, -90);
     private final Pose point55swooproundthehiveControl1 = poseFactory.of(22, 116, 0);
-    private final Pose point66torearflower = poseFactory.of(48, 118, 90);
-    private final Pose point66torearflowerSegment1Heading = poseFactory.of(48, 118, -90);
-    private final Pose point66torearflowerSegment2Start = poseFactory.of(48, 118, -90);
-    private final Pose point66torearflowerSegment2End = poseFactory.of(48, 118, 0);
-    private final Pose point66torearflowerSegment3Start = poseFactory.of(48, 118, 0);
-    private final Pose point66torearflowerSegment3End = poseFactory.of(48, 118, 90);
-    private final Pose point66torearflowerSegment4Heading = poseFactory.of(48, 118, 90);
-    private final Pose point77grabrearflower = poseFactory.of(48, 125.1, 90);
-    private final Pose point88backoutofflower = poseFactory.of(48, 118, 90);
+    private final Pose point66torearflower = poseFactory.of(46.75, 119.125, 90);
+    private final Pose point66torearflowerSegment1Heading = poseFactory.of(46.75, 119.125, -90);
+    private final Pose point66torearflowerSegment2Start = poseFactory.of(46.75, 119.125, -90);
+    private final Pose point66torearflowerSegment2End = poseFactory.of(46.75, 119.125, 0);
+    private final Pose point66torearflowerSegment3Start = poseFactory.of(46.75, 119.125, 0);
+    private final Pose point66torearflowerSegment3End = poseFactory.of(46.75, 119.125, 90);
+    private final Pose point66torearflowerSegment4Heading = poseFactory.of(46.75, 119.125, 90);
+    private final Pose point77grabrearflower = poseFactory.of(46.75, 126.225, 90);
+    private final Pose point88backoutofflower = poseFactory.of(46.75, 119.125, 90);
     private final Pose point99backtolaunchspot = poseFactory.of(58, 116, -90);
     private final Pose point99backtolaunchspotSegment1Start = poseFactory.of(58, 116, 90);
     private final Pose point99backtolaunchspotSegment1End = poseFactory.of(58, 116, 180);
     private final Pose point99backtolaunchspotSegment2Start = poseFactory.of(58, 116, 180);
     private final Pose point99backtolaunchspotSegment2End = poseFactory.of(58, 116, 270);
     private final Pose point99backtolaunchspotSegment3Heading = poseFactory.of(58, 116, -90);
-    private final Pose point1010park = poseFactory.of(13, 108, -90);
+    private final Pose point1010park = poseFactory.of(11.875, 108, -90);
 
     // Autonomous routine
     public Command autoRoutine() {
