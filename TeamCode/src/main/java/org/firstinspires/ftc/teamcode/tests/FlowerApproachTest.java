@@ -402,8 +402,8 @@ public class FlowerApproachTest extends LinearOpMode {
         static final double timeoutSec = 4.0;
 
         // paste the numbers from this test's results screen here. corrected = scale * reading + offset
-        public static final double leftScale = 1.3844, leftOffset = 1.471;
-        public static final double rightScale = 1.2481, rightOffset = 2.256;
+        public static final double leftScale = 1.2649, leftOffset = 1.718;
+        public static final double rightScale = 1.2237, rightOffset = 2.285;
 
         public static double[] pastedFix() {
             return new double[]{leftScale, leftOffset, rightScale, rightOffset};
