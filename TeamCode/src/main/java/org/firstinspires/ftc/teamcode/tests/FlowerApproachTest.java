@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.tests;
 
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Velocity;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.AnalogInput;
@@ -18,6 +19,7 @@ import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession.Stage;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.Command;
 import org.json.JSONArray;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 // step by step ultrasonic check, the driver hub tells you what to do
@@ -55,6 +57,7 @@ public class FlowerApproachTest extends LinearOpMode {
     public void runOpMode() {
         follower = Constants.create(hardwareMap);
         approach = new WallApproach(hardwareMap);
+        List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
         session = new CalibrationSession(tapeDistances, settleSec, recordSec, goodEnough, jumpy,
                 WallApproach.stopDistance, tooFar, WallApproach.defaultSpacing, WallApproach.defaultSetback);
         session.setPastedFix(WallApproach.pastedFix());
@@ -69,6 +72,7 @@ public class FlowerApproachTest extends LinearOpMode {
         try {
             // runs through init too: the sensor steps never move the robot, only the drive check needs START
             while (!isStopRequested()) {
+                Ultrasonic.clearBulkCache(hubs);   // fresh hub data once per loop, signal + Vcc from the same read
                 boolean canDrive = opModeIsActive();
                 double t = clock.seconds();
                 session.setStarted(canDrive);

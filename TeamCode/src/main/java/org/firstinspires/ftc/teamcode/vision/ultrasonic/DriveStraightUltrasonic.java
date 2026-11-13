@@ -1,12 +1,16 @@
 package org.firstinspires.ftc.teamcode.vision.ultrasonic;
 
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.teamcode.tests.Ultrasonic;
 import org.firstinspires.ftc.teamcode.tests.Ultrasonic.HrlvShortRange;
+
+import java.util.List;
 
 /**
  * Hold TRIANGLE to drive forward toward the wall. Each side of the drivetrain is controlled by the
@@ -53,12 +57,15 @@ public class DriveStraightUltrasonic extends LinearOpMode {
             m.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         }
 
+        List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
+
         telemetry.addData("Status", "Initialized. Hold TRIANGLE to drive to the wall.");
         telemetry.update();
 
         waitForStart();
 
         while (opModeIsActive()) {
+            Ultrasonic.clearBulkCache(hubs);
             // Read every loop so the filters stay fresh even while not driving
             double leftMm = left.getDistanceMm();
             double rightMm = right.getDistanceMm();

@@ -1,11 +1,14 @@
 package org.firstinspires.ftc.teamcode.tests;
 
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.AnalogInput;
+import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import java.util.Arrays;
+import java.util.List;
 
 @TeleOp(name = "MaxBotix HRLV-ShortRange Test", group = "Sensor")
 public class Ultrasonic extends LinearOpMode {
@@ -18,6 +21,21 @@ public class Ultrasonic extends LinearOpMode {
     private static final String LEFT_VCC = "ultrasonic_left_vcc";
     private static final String RIGHT_SIGNAL = "ultrasonic_right_signal";
     private static final String RIGHT_VCC = "ultrasonic_right_vcc";
+
+    /**
+     * Puts every hub in MANUAL bulk caching. Call clearBulkCache(hubs) once at the top of every loop:
+     * then the first read in a loop fetches all 4 analog channels in one transaction, so a sensor's signal and
+     * Vcc come from the same instant (and the loop runs faster). Forgetting to clear = readings never change.
+     */
+    public static List<LynxModule> manualBulkReads(HardwareMap hardwareMap) {
+        List<LynxModule> hubs = hardwareMap.getAll(LynxModule.class);
+        for (LynxModule hub : hubs) hub.setBulkCachingMode(LynxModule.BulkCachingMode.MANUAL);
+        return hubs;
+    }
+
+    public static void clearBulkCache(List<LynxModule> hubs) {
+        for (LynxModule hub : hubs) hub.clearBulkCache();
+    }
 
     /**
      * Reads one MaxBotix HRLV-ShortRange-EZ (MB16xx) using the ratiometric method.
@@ -157,12 +175,15 @@ public class Ultrasonic extends LinearOpMode {
         HrlvShortRange right = new HrlvShortRange(
                 hardwareMap.get(AnalogInput.class, RIGHT_SIGNAL), hardwareMap.get(AnalogInput.class, RIGHT_VCC));
 
+        List<LynxModule> hubs = manualBulkReads(hardwareMap);
+
         telemetry.addData("Status", "Initialized. Waiting for start...");
         telemetry.update();
 
         waitForStart();
 
         while (opModeIsActive()) {
+            clearBulkCache(hubs);
             double leftMm = left.getDistanceMm();
             double rightMm = right.getDistanceMm();
 

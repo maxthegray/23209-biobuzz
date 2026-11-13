@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.tests.flowerdash;
 
 import com.pedropathing.follower.Follower;
+import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -9,6 +10,9 @@ import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
+import org.firstinspires.ftc.teamcode.tests.Ultrasonic;
+
+import java.util.List;
 
 // autonomous: after START the robot turns in place on its own until both ultrasonic sensors read the same distance,
 // so it ends up square to the wall. no buttons needed.
@@ -35,10 +39,12 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
     public void runOpMode() {
         Follower follower = Constants.create(hardwareMap);
         WallApproach sensors = new WallApproach(hardwareMap);   // just for the calibrated readings
+        List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         // show live readings during init too, the robot doesn't move until START
         while (opModeInInit()) {
+            Ultrasonic.clearBulkCache(hubs);
             showReadings(sensors);
             telemetry.addLine("Press START, the robot will align itself");
             telemetry.update();
@@ -53,6 +59,7 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
 
         try {
             while (opModeIsActive()) {
+                Ultrasonic.clearBulkCache(hubs);
                 double dt = Math.min(loopTimer.seconds(), 0.1);
                 loopTimer.reset();
                 double turn = 0;
