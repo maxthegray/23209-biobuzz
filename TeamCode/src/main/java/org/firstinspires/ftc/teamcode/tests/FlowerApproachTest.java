@@ -254,7 +254,7 @@ public class FlowerApproachTest extends LinearOpMode {
         boolean differs = Math.abs(leftFit.scale - k[0]) > 0.005 || Math.abs(leftFit.offset - k[1]) > 0.02
                 || Math.abs(rightFit.scale - k[2]) > 0.005 || Math.abs(rightFit.offset - k[3]) > 0.02;
         if (Math.max(worst[0], worst[1]) > goodEnough && differs) {
-            telemetry.addLine("Update the fix in WallApproach (FlowerApproachTest.java) to:");
+            telemetry.addLine("Update the fix in UltrasonicCalibration.java to:");
             telemetry.addLine(String.format("  leftScale = %.4f, leftOffset = %.3f", leftFit.scale, leftFit.offset));
             telemetry.addLine(String.format("  rightScale = %.4f, rightOffset = %.3f", rightFit.scale, rightFit.offset));
         }
@@ -401,15 +401,12 @@ public class FlowerApproachTest extends LinearOpMode {
         static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower
         static final double timeoutSec = 4.0;
 
-        // paste the numbers from this test's results screen here. corrected = scale * reading + offset
-        public static final double leftScale = 1.2649, leftOffset = 1.718;
-        public static final double rightScale = 1.2237, rightOffset = 2.285;
-
+        // the fix lives in UltrasonicCalibration.java, edit it there. corrected = scale * reading + offset
         public static double[] pastedFix() {
-            return new double[]{leftScale, leftOffset, rightScale, rightOffset};
+            return UltrasonicCalibration.values();
         }
-        private double leftScaleNow = leftScale, leftOffsetNow = leftOffset;
-        private double rightScaleNow = rightScale, rightOffsetNow = rightOffset;
+        private double leftScaleNow = UltrasonicCalibration.leftScale, leftOffsetNow = UltrasonicCalibration.leftOffset;
+        private double rightScaleNow = UltrasonicCalibration.rightScale, rightOffsetNow = UltrasonicCalibration.rightOffset;
         static final double minReading = 1.0;   // in. under this is a loose signal wire (it reads as 0.8), not a real wall
 
         private final Ultrasonic.HrlvShortRange leftSensor, rightSensor;

@@ -1,0 +1,132 @@
+package org.firstinspires.ftc.teamcode.tests;
+
+import com.pedropathing.follower.Follower;
+import com.qualcomm.hardware.lynx.LynxModule;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.Range;
+
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
+
+import java.util.List;
+
+// drives up to the wall and stops a set distance away, using the calibrated ultrasonic readings
+// (the fix in UltrasonicCalibration.java). it also squares up to the wall.
+//
+// INIT:  D-pad up / down changes the stop distance by STEP_IN. the distance is locked once you press START.
+// START: HOLD A to drive, letting go stops it right away. hold A again for another try.
+//
+// distance is from the bumper, which is the sensor faces while WallApproach.defaultSetback is 0
+@TeleOp(name = "Drive to Wall (ultrasonic)", group = "test")
+public class DriveToWallTest extends LinearOpMode {
+
+    static final double DEFAULT_TARGET_IN = 7.0;   // stop distance, bumper to wall, before you change it
+    static final double STEP_IN = 0.25;   // how much one D-pad press changes it
+    static final double MIN_TARGET_IN = 2.0;   // the sensors read down to ~1 in, keep some margin
+    static final double MAX_TARGET_IN = 24.0;
+    static final double TOO_FAR = 30;   // in, won't start unless both sensors see the wall closer than this
+
+    @Override
+    public void runOpMode() {
+        Follower follower = Constants.create(hardwareMap);
+        WallApproach approach = new WallApproach(hardwareMap);   // uses UltrasonicCalibration, nothing overrides it here
+        List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
+        telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
+
+        double target = DEFAULT_TARGET_IN;
+        boolean lastUp = false, lastDown = false;
+
+        // init: pick the distance. the robot never moves here
+        while (opModeInInit()) {
+            Ultrasonic.clearBulkCache(hubs);
+            boolean up = gamepad1.dpad_up, down = gamepad1.dpad_down;
+            if (up && !lastUp) target += STEP_IN;
+            if (down && !lastDown) target -= STEP_IN;
+            lastUp = up;
+            lastDown = down;
+            target = Range.clip(target, MIN_TARGET_IN, MAX_TARGET_IN);
+
+            telemetry.addLine(String.format("STOP DISTANCE: %.2f in   (D-pad up/down = +/- %.2f)", target, STEP_IN));
+            telemetry.addLine("");
+            showReadings(approach, target);
+            showFix();
+            telemetry.addLine("");
+            telemetry.addLine("Point the robot at the wall from 1-2 ft");
+            telemetry.addLine("Press START, then HOLD A to drive");
+            telemetry.update();
+            sleep(20);
+        }
+
+        final double stopAt = target;   // locked from here on
+        WallApproach.Result result = null;
+        boolean driving = false, lastHeld = false;
+        String note = "";
+
+        try {
+            while (opModeIsActive()) {
+                Ultrasonic.clearBulkCache(hubs);
+                boolean held = gamepad1.a;
+                boolean pressed = held && !lastHeld;
+                lastHeld = held;
+
+                if (!held) {
+                    if (driving) follower.manual(0, 0, 0);
+                    driving = false;
+                } else if (pressed) {
+                    double l = approach.leftNow(), r = approach.rightNow();
+                    if (Double.isNaN(l) || Double.isNaN(r) || l > TOO_FAR || r > TOO_FAR) {
+                        result = null;
+                        note = "Didn't start: both sensors need the wall within " + (int) TOO_FAR + " in";
+                    } else {
+                        approach.start(stopAt);
+                        result = WallApproach.Result.RUNNING;
+                        driving = true;
+                        note = "";
+                    }
+                }
+
+                telemetry.addLine(String.format("DRIVE TO WALL, stops %.2f in away", stopAt));
+                if (driving && result == WallApproach.Result.RUNNING) {
+                    result = approach.update(follower);
+                    approach.addTelemetry(telemetry);
+                } else {
+                    showReadings(approach, stopAt);
+                }
+                follower.update();
+
+                if (!note.isEmpty()) telemetry.addLine(note);
+                if (result == WallApproach.Result.DONE) {
+                    telemetry.addLine(String.format("DONE. Thinks the bumper is %.2f in away. Tape it and compare", approach.bumperToWall()));
+                } else if (result == WallApproach.Result.FAILED) {
+                    telemetry.addLine("Gave up (4 s timeout or a bad reading). Let go and hold A again");
+                } else if (driving) {
+                    telemetry.addLine("Driving... let go of A to stop");
+                } else {
+                    telemetry.addLine("HOLD A to drive");
+                }
+                showFix();
+                telemetry.update();
+            }
+        } finally {
+            follower.manual(0, 0, 0);
+            if (opModeIsActive()) follower.update();
+        }
+    }
+
+    // calibrated readings while not driving
+    private void showReadings(WallApproach approach, double target) {
+        double l = approach.leftNow(), r = approach.rightNow();
+        double wall = (l + r) / 2;
+        telemetry.addData("Left / Right", "%.2f in / %.2f in", l, r);
+        telemetry.addData("Wall", "%.2f in (%.2f to go)", wall, wall - approach.sensorSetback() - target);
+    }
+
+    // so you can see on the Driver Hub which fix is being used
+    private void showFix() {
+        telemetry.addLine(String.format("Fix: left %.4f x + %.3f   right %.4f x + %.3f",
+                UltrasonicCalibration.leftScale, UltrasonicCalibration.leftOffset,
+                UltrasonicCalibration.rightScale, UltrasonicCalibration.rightOffset));
+    }
+}

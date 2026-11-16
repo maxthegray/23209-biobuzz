@@ -11,12 +11,13 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
 import org.firstinspires.ftc.teamcode.tests.Ultrasonic;
+import org.firstinspires.ftc.teamcode.tests.UltrasonicCalibration;
 
 import java.util.List;
 
 // autonomous: after START the robot turns in place on its own until both ultrasonic sensors read the same distance,
 // so it ends up square to the wall. no buttons needed.
-// readings use the same fix as FlowerApproachTest: corrected = scale * raw + offset (WallApproach.leftScale etc.)
+// readings use the fix in UltrasonicCalibration.java: corrected = scale * raw + offset
 // sign convention: left sensor counts negative, right counts positive. difference = right - left.
 // right reads farther (difference > 0) = positive turn, left reads farther (difference < 0) = negative turn.
 @Autonomous(name = "UltrasonicAlignment", group = "test")
@@ -124,12 +125,12 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
     // reads each sensor once, shows raw + fix + corrected, returns {left, right} corrected
     private double[] showReadings(WallApproach sensors) {
         double rawL = sensors.rawLeft(), rawR = sensors.rawRight();
-        double left = WallApproach.leftScale * rawL + WallApproach.leftOffset;
-        double right = WallApproach.rightScale * rawR + WallApproach.rightOffset;
+        double left = UltrasonicCalibration.left(rawL);
+        double right = UltrasonicCalibration.right(rawR);
         telemetry.addData("Left ", "raw %5.2f x %.4f + %.3f = %5.2f in",
-                rawL, WallApproach.leftScale, WallApproach.leftOffset, left);
+                rawL, UltrasonicCalibration.leftScale, UltrasonicCalibration.leftOffset, left);
         telemetry.addData("Right", "raw %5.2f x %.4f + %.3f = %5.2f in",
-                rawR, WallApproach.rightScale, WallApproach.rightOffset, right);
+                rawR, UltrasonicCalibration.rightScale, UltrasonicCalibration.rightOffset, right);
         return new double[]{left, right};
     }
 }
