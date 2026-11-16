@@ -24,7 +24,7 @@ public class WallApproach {
 
     static final double flowerFromWall = 3.0;   // guess, measure on a real field
     static final double flowerReach = 2.4;   // top ring sticks out this far
-    static final double clearance = 1.0;   // don't touch the flower
+    static final double clearance = 2.2;   // don't touch the flower. the sensors sit about 1.1 in ahead of the frame (9 in from the pinpoint, frame is 7.875)
     public static final double stopDistance = flowerFromWall + flowerReach + clearance;   // bumper to wall
 
     static final double settleSec = 0.4;   // after stopping, let the sensor's filter catch up
@@ -157,6 +157,7 @@ public class WallApproach {
 
             // forward by what it measured (most of it when far, closer than the target = only backs up), turn out the angle, sideways from pedro plus the flower shift
             double forward = Math.abs(error) < distanceTolerance ? 0 : Math.abs(error) <= maxStep ? error : Math.copySign(Math.max(maxStep, farStep * Math.abs(error)), error);
+            if (offCenter) forward = Math.min(forward, 0);   // a sensor is right in front of the flower, get centered before going any closer
             double side = Math.abs(leftError + flowerShift) > strafeTolerance ? leftError + flowerShift : 0;
             double turn = Math.abs(angle) < angleTolerance ? 0 : -Math.toRadians(angle);   // left reading longer = turned ccw, so turn back cw
             Pose p = follower.pose();

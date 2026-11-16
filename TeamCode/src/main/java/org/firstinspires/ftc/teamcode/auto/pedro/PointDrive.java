@@ -13,7 +13,7 @@ public class PointDrive {
     static final double kpDrive = 0.11, kdDrive = 0.018;   // power per inch, power per in/s (the second one is the brake)
     static final double kpStrafe = 0.14, kdStrafe = 0.021;
     static final double kpTurn = 0.02, kdTurn = 0.0026;   // power per degree, power per deg/s
-    static final double maxDrive = 0.65, maxTurn = 0.5;
+    static final double maxDrive = 0.65, maxTurn = 0.7;
     static final double minPower = 0.06, minTurn = 0.05;
     static final double pushRate = 0.6;   // power per second added while a direction is stuck
     static final double maxPush = 0.25;
