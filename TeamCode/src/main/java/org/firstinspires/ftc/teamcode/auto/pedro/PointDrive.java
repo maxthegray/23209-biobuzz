@@ -10,15 +10,16 @@ import com.qualcomm.robotcore.util.Range;
 // pedro paths go full power and brake at the end, which stutters on short moves and overshoots into walls
 public class PointDrive {
 
-    static final double kpDrive = 0.07, kdDrive = 0.012;   // power per inch, power per in/s (the second one is the brake)
-    static final double kpStrafe = 0.09, kdStrafe = 0.014;
+    static final double kpDrive = 0.11, kdDrive = 0.018;   // power per inch, power per in/s (the second one is the brake)
+    static final double kpStrafe = 0.14, kdStrafe = 0.021;
     static final double kpTurn = 0.02, kdTurn = 0.0026;   // power per degree, power per deg/s
-    static final double maxDrive = 0.5, maxTurn = 0.5;
+    static final double maxDrive = 0.65, maxTurn = 0.5;
     static final double minPower = 0.06, minTurn = 0.05;
     static final double pushRate = 0.6;   // power per second added while a direction is stuck
     static final double maxPush = 0.25;
 
     public static final double closeIn = 0.5, closeDeg = 1.5;
+    public static final double roughIn = 1.5, roughDeg = 4;   // for spots it's only passing through
 
     private final ElapsedTime sinceUpdate = new ElapsedTime();
     private double drivePush, strafePush, turnPush;
@@ -37,6 +38,11 @@ public class PointDrive {
 
     public boolean update(Follower follower, Pose target) {
         return update(follower, target, closeIn, closeDeg, true);
+    }
+
+    // close is good enough and it doesn't wait to stop, the next move takes it from there
+    public boolean updateRough(Follower follower, Pose target) {
+        return update(follower, target, roughIn, roughDeg, false);
     }
 
     // sets pedro's manual powers, caller still calls follower.update(). true = it's there (and stopped, if mustStop)

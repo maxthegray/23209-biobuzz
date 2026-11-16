@@ -65,6 +65,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double stopAt = 29.5;
     private static final double avgSpeed = 30;   // in/s, rough guess for how long parking takes
     private static final double parkBuffer = 1.5;
+    private static final double lastShotDrive = 3.5;   // s, rough time to get to the rear shot and turn around
 
     private static final long shotMs = 700;
     private static final long intakeMs = 1500;
@@ -78,7 +79,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final boolean fixPoseAtWall = false;   // true = let the wall reading correct pedro's position after the adjust
     private static final double maxPoseFix = 4.0;   // ultrasonics disagree with pedro by more than this = don't trust them
     private static final double handoff = 10;   // in. pedro stops this far short and the gentle driver does the rest, so pedro's overshoot can't reach a wall
-    private static final double maxAdjust = 3.0;   // the adjust can't take it further than this from pedro's pickup spot
+    private static final double maxAdjust = 8.0;   // the adjust can't take it further than this from pedro's pickup spot (it slides up to ~6.5 in sideways to find the flower)
 
     private Follower follower;
     private BatteryDrive drive;
@@ -155,15 +156,21 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Garden", intakeAndBackUp(gardenPickup, gardenBackup))) return false;
             if (!step("Swoop to rear", swoopToRearShoot())) return false;
             if (!step("Shoot garden balls", shoot())) return false;
-            if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, rearFlowerLineup))) return false;
+            if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, null))) return false;
         } else {
             if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, sideFlowerLineup))) return false;
             if (!step("Back to shoot", backToAudienceShot())) return false;
             if (!step("Shoot again", shoot())) return false;
             if (!step("Climb to rear flower", climbToRearFlower())) return false;
-            if (!step("Rear flower", intakeFromFlower(rearFlowerPickup, rearFlowerLineup))) return false;
+            if (!step("Rear flower", intakeFromFlower(rearFlowerPickup, null))) return false;
         }
 
+        // parking is worth points and this shot isn't, so don't start it unless it can finish
+        double shotNeeds = lastShotDrive + balls * shotMs / 1000.0 + parkTimeFrom(rearShootPose);
+        if (autoLength - timer.seconds() < shotNeeds) {
+            logStep(String.format("No time for last shot (needs %.0f s)", shotNeeds));
+            return true;
+        }
         if (!step("Back to rear shot", backToRearShot())) return false;
         return step("Shoot flower balls", shoot());
     }
@@ -187,12 +194,13 @@ public class PathDemoAllCombos extends LinearOpMode {
     // drive over without turning, then spin to face it. turning on the way made it jerk
     private boolean pickUpFlower(Pose lineup, Pose pickup, Pose backup) {
         status = "Lining up";
-        if (!slideTo(lineup)) return false;
-        if (!turnTo(lineup.heading())) return false;
+        if (!slideTo(lineup, true)) return false;
+        if (!turnTo(lineup.heading(), false)) return false;
         return intakeFromFlower(pickup, backup);
     }
 
     // pedro drives in like normal, then the ultrasonics adjust. if they give up it just stays where pedro put it
+    // backup null = don't back up, the next move leaves from here
     private boolean intakeFromFlower(Pose pickup, Pose backup) {
         status = "Driving in";
         if (!driveTo(pickup)) return false;
@@ -200,8 +208,9 @@ public class PathDemoAllCombos extends LinearOpMode {
         status = "Intaking (simulated)";
         if (!waitMs(intakeMs)) return false;
         balls = maxBalls;
+        if (backup == null) return true;
         status = "Backing up";
-        return driveTo(backup);
+        return driveTo(backup, true);
     }
 
     // squares up so both sensors read the same, then creeps to the stop distance. false = out of time
@@ -226,15 +235,17 @@ public class PathDemoAllCombos extends LinearOpMode {
             updateTelemetry();
         }
         approaching = false;
+        double shift = sonar.flowerShift();
+        String shiftNote = Math.abs(shift) < 0.1 ? "" : String.format(" slid %.1f %s", Math.abs(shift), shift > 0 ? "left" : "right");
         if (result == WallApproach.Result.DONE) {
-            stepNote = " sonar";
+            stepNote = " sonar" + shiftNote;
             fixPoseFromWall();
             return true;
         }
         follower.manual(0, 0, 0);
-        sonarResult = wandered ? "wanted to go too far, back to pedro's spot" : "failed, back to pedro's spot";
-        stepNote = " sonar failed";
-        if (follower.pose().distance(pickup) > 1) return driveTo(redPickup);
+        sonarResult = wandered ? "wanted to go too far, back to pedro's spot" : "gave up, staying here";
+        stepNote = " sonar failed" + shiftNote;
+        if (wandered) return driveTo(redPickup);
         return opModeIsActive() && !outOfTime();
     }
 
@@ -267,16 +278,16 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private boolean lineUpForGarden() {
         status = "To the turn spot";
-        if (!slideTo(gardenTurnSpot)) return false;
+        if (!slideTo(gardenTurnSpot, true)) return false;
         status = "Turning around";
-        if (!turnTo(gardenLineup.heading())) return false;
+        if (!turnTo(gardenLineup.heading(), false)) return false;
         status = "Lining up";
         return driveTo(gardenLineup);
     }
 
     private boolean backToAudienceShot() {
         status = "Back to shoot";
-        if (!turnTo(audienceShootPose.heading())) return false;   // turn here, there's no room for it by the wall
+        if (!turnTo(audienceShootPose.heading(), false)) return false;   // turn here, there's no room for it by the wall
         return driveTo(audienceShootPose);
     }
     // private boolean backToAudienceShot() {
@@ -295,7 +306,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private boolean backToRearShot() {
         status = "Back to the rear shot";
         if (!slideTo(rearShootPose)) return false;
-        return turnTo(rearShootPose.heading());
+        return turnTo(rearShootPose.heading(), true);
     }
 
     private boolean intakeAndBackUp(Pose pickup, Pose backup) {
@@ -305,7 +316,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         if (!waitMs(intakeMs)) return false;
         balls = maxBalls;
         status = "Backing up";
-        return driveTo(backup);
+        return driveTo(backup, true);
     }
 
     private boolean swoopToRearShoot() {
@@ -320,21 +331,28 @@ public class PathDemoAllCombos extends LinearOpMode {
         Pose target = mirrorIfBlue(rearFlowerLineup);
         Path path = curve(follower.pose(), mirrorIfBlue(climbControl1), mirrorIfBlue(climbControl2), target);
         if (!follow(path.constant(target.heading()))) return false;
-        return easeTo(target);
+        return easeTo(target, true);   // it drives straight in from here
     }
 
+    // parks facing whichever way is closest, turning around first just burns time
     private void park() {
         parking = true;
         status = "Parking";
         Pose here = mirrorIfBlue(follower.pose());
-        if (here.y() < parkWaypoint.y()) driveTo(parkWaypoint.withHeading(here.heading()));
-        driveTo(parkPose);
+        double facing = Math.round(here.heading() / (Math.PI / 2)) * (Math.PI / 2);
+        if (here.y() < parkWaypoint.y()) driveTo(parkWaypoint.withHeading(facing), true);
+        driveTo(parkPose.withHeading(facing));
     }
 
     // pedro does the long part fast, then the gentle driver eases it onto the spot. short moves are all gentle
     private boolean driveTo(Pose redTarget) {
+        return driveTo(redTarget, false);
+    }
+
+    // rough = just passing through, so close is good enough and it doesn't wait to stop
+    private boolean driveTo(Pose redTarget, boolean rough) {
         Pose target = mirrorIfBlue(redTarget);
-        if (Math.abs(angleTo(target.heading(), follower.pose().heading())) > Math.toRadians(20) && !spinTo(target.heading())) return false;
+        if (Math.abs(angleTo(target.heading(), follower.pose().heading())) > Math.toRadians(20) && !spinTo(target.heading(), false)) return false;
 
         Pose here = follower.pose();
         double dist = here.distance(target);
@@ -343,36 +361,42 @@ public class PathDemoAllCombos extends LinearOpMode {
             Pose stopShort = new Pose(here.x() + part * (target.x() - here.x()), here.y() + part * (target.y() - here.y()), here.heading());
             if (!follow(line(here, stopShort).constant(here.heading()))) return false;
         }
-        return easeTo(target);
+        return easeTo(target, rough);
     }
 
     // drives there still facing the same way
     private boolean slideTo(Pose redTarget) {
-        return driveTo(redTarget.withHeading(mirrorIfBlue(follower.pose()).heading()));
+        return slideTo(redTarget, false);
     }
 
-    private boolean turnTo(double redHeading) {
-        return spinTo(isBlue ? redHeading + Math.PI : redHeading);
+    private boolean slideTo(Pose redTarget, boolean rough) {
+        return driveTo(redTarget.withHeading(mirrorIfBlue(follower.pose()).heading()), rough);
+    }
+
+    // exact = it has to end dead on (shooting). otherwise the drive right after cleans up the last few degrees
+    private boolean turnTo(double redHeading, boolean exact) {
+        return spinTo(isBlue ? redHeading + Math.PI : redHeading, exact);
     }
 
     // spins in place. a 180 aims 90 deg ccw first so it can't flip between left and right
-    private boolean spinTo(double heading) {
+    private boolean spinTo(double heading, boolean exact) {
         Pose spot = follower.pose();
         if (Math.abs(angleTo(heading, spot.heading())) > Math.toRadians(150)
-                && !spin(spot.withHeading(spot.heading() + Math.PI / 2), 30)) return false;
-        if (!spin(spot.withHeading(heading), 10)) return false;
-        return easeTo(spot.withHeading(heading));   // finishes the turn and puts it back on the spot if it drifted
+                && !spin(spot.withHeading(spot.heading() + Math.PI / 2), 30, 999)) return false;
+        if (!spin(spot.withHeading(heading), 3, 40)) return false;
+        return !exact || easeTo(spot.withHeading(heading));   // finishes the turn and puts it back on the spot if it drifted
     }
 
-    // pedro's hold does the big part of a turn fast
-    private boolean spin(Pose target, double closeEnoughDeg) {
+    // pedro's hold does the turn. done once it's close and has slowed down, so the next move doesn't get handed a spinning robot
+    private boolean spin(Pose target, double closeEnoughDeg, double slowEnoughDegPerSec) {
         lastTarget = target;
         follower.hold(target);
         ElapsedTime wait = new ElapsedTime();
         while (opModeIsActive() && wait.seconds() < 1.5) {
             if (outOfTime()) return false;
             follower.update();
-            if (Math.abs(angleTo(target.heading(), follower.pose().heading())) < Math.toRadians(closeEnoughDeg)) return true;
+            boolean close = Math.abs(angleTo(target.heading(), follower.pose().heading())) < Math.toRadians(closeEnoughDeg);
+            if (close && Math.abs(follower.velocity().omega) < Math.toRadians(slowEnoughDegPerSec)) return true;
             updateTelemetry();
         }
         return opModeIsActive();
@@ -380,6 +404,10 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     // slows down as it gets close and stops on the spot, see PointDrive. gives up after a bit so the auto never hangs
     private boolean easeTo(Pose target) {
+        return easeTo(target, false);
+    }
+
+    private boolean easeTo(Pose target, boolean rough) {
         lastTarget = target;
         pointDrive.start();
         double limit = 1.5 + follower.pose().distance(target) / 8;
@@ -387,13 +415,15 @@ public class PathDemoAllCombos extends LinearOpMode {
         boolean there = false;
         while (opModeIsActive() && !there && !pointDrive.blocked() && time.seconds() < limit) {
             if (outOfTime()) return false;
-            there = pointDrive.update(follower, target);
+            there = rough ? pointDrive.updateRough(follower, target) : pointDrive.update(follower, target);
             follower.update();
             updateTelemetry();
         }
         if (!there) timesStuck++;
-        follower.stop();   // wheels off between moves no matter how it ended
-        follower.update();
+        if (!rough || !there) {
+            follower.stop();   // wheels off between moves no matter how it ended
+            follower.update();
+        }
         Pose p = follower.pose();
         stopError = String.format("%.1f in, %.0f deg", p.distance(target), Math.abs(Math.toDegrees(angleTo(target.heading(), p.heading()))));
         return opModeIsActive();
@@ -487,7 +517,10 @@ public class PathDemoAllCombos extends LinearOpMode {
     }
 
     private double timeToPark() {
-        Pose here = mirrorIfBlue(follower.pose());
+        return parkTimeFrom(mirrorIfBlue(follower.pose()));
+    }
+
+    private double parkTimeFrom(Pose here) {
         double speed = avgSpeed * Math.min(1, drive.voltage / nominalVoltage);   // a tired battery can't hit full speed even with the boost
         return Math.hypot(here.x() - parkPose.x(), here.y() - parkPose.y()) / speed + parkBuffer;
     }

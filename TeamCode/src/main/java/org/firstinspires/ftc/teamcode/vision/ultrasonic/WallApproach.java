@@ -28,26 +28,28 @@ public class WallApproach {
     public static final double stopDistance = flowerFromWall + flowerReach + clearance;   // bumper to wall
 
     static final double settleSec = 0.4;   // after stopping, let the sensor's filter catch up
-    static final double averageSec = 0.3;   // then average this long, the flicker between steps averages out
+    static final double averageSec = 0.2;   // then average this long, the flicker between steps averages out
     static final double maxStep = 4.0;   // in, longest single move before it measures again
     static final double farStep = 0.8;   // further than maxStep away = go 80% of it, then measure again
 
     // these steer the moves, and they use odometry so there's no lag
     static final double kpDrive = 0.08;   // power per inch
     static final double kpTurn = 0.02;   // power per degree
-    static final double kpStrafe = 0.06;
-    static final double maxDrive = 0.3, maxTurn = 0.2, maxStrafe = 0.2;
-    static final double minPower = 0.07, minTurn = 0.05, minStrafe = 0.05;
+    static final double kpStrafe = 0.09;
+    static final double maxDrive = 0.3, maxTurn = 0.2, maxStrafe = 0.35;   // sideways takes more power to get going
+    static final double minPower = 0.07, minTurn = 0.05, minStrafe = 0.1;
     static final double pushRate = 0.6;   // power per second added while a direction is stuck, low powers can't beat the wheel friction
     static final double maxPush = 0.25;
-    static final double arrivedIn = 0.15, arrivedDeg = 0.5;
+    static final double arrivedIn = 0.3, arrivedDeg = 1.0, arrivedSide = 0.3;
     static final double moveTimeoutSec = 1.5;
 
-    static final double distanceTolerance = 0.5;
-    static final double angleTolerance = 2.0;
+    static final double distanceTolerance = 0.75;   // the sensor is only good to about half an inch, chasing less than that just wastes time
+    static final double angleTolerance = 2.5;
     static final double strafeTolerance = 0.75;
     static final double maxSkew = 2.5;   // in. 7.5 in apart, so 2.5 in is already ~18 deg crooked. more = a sensor is seeing the flower
     static final double timeoutSec = 6.0;
+    static final double trustMove = 2.5;   // in. a straight move this short lands where it measured, no need to stop and measure again
+    static final int maxShifts = 3;   // sideways tries at finding the flower (3.75, 1.9, 0.9 in)
 
     // TUNED: paste the numbers from the Flower Approach Test results here. corrected = scale * reading + offset
     public static final double leftScale = 1.3844, leftOffset = 1.471;
@@ -70,6 +72,10 @@ public class WallApproach {
     private double sumLeft, sumRight;
     private int count;
     private Pose moveTarget;
+    private double flowerShift, nextShift;
+    private int shifts;
+    private boolean checkAgain;
+    private double plannedForward;
 
     private double left, right, wallDist, error, angle, drivePower, strafePower, turnPower;
     private boolean useAngle = true;
@@ -89,6 +95,9 @@ public class WallApproach {
 
     public void start(double bumperToWall) {
         target = bumperToWall;
+        flowerShift = 0;
+        nextShift = sensorSpacing / 2;
+        shifts = 0;
         timer.reset();
         sinceUpdate.reset();
         startMeasuring(null);
@@ -133,18 +142,28 @@ public class WallApproach {
 
             double l = sumLeft / count, r = sumRight / count;
             useAngle = Math.abs(l - r) < maxSkew;
+            // one sensor reading way shorter = that sensor is on the flower, so the robot is off to the side
+            // slide toward that sensor, half as far each time. first try puts the flower from one sensor to the middle
+            boolean offCenter = !useAngle && shifts < maxShifts;
+            if (offCenter) {
+                flowerShift += l < r ? nextShift : -nextShift;
+                nextShift /= 2;
+                shifts++;
+            }
             wallDist = useAngle ? (l + r) / 2.0 : Math.max(l, r);
             error = wallDist - sensorSetback - target;
             angle = useAngle ? angleFrom(l, r) : 0;
-            if (Math.abs(error) < distanceTolerance && Math.abs(angle) < angleTolerance) return finish(follower, Result.DONE);
+            if (!offCenter && Math.abs(error) < distanceTolerance && Math.abs(angle) < angleTolerance) return finish(follower, Result.DONE);
 
-            // forward by what it measured (most of it when far, closer than the target = only backs up), turn out the angle, sideways from pedro
+            // forward by what it measured (most of it when far, closer than the target = only backs up), turn out the angle, sideways from pedro plus the flower shift
             double forward = Math.abs(error) < distanceTolerance ? 0 : Math.abs(error) <= maxStep ? error : Math.copySign(Math.max(maxStep, farStep * Math.abs(error)), error);
-            double side = Math.abs(leftError) > strafeTolerance ? leftError : 0;
+            double side = Math.abs(leftError + flowerShift) > strafeTolerance ? leftError + flowerShift : 0;
             double turn = Math.abs(angle) < angleTolerance ? 0 : -Math.toRadians(angle);   // left reading longer = turned ccw, so turn back cw
             Pose p = follower.pose();
             double h = p.heading();
             moveTarget = new Pose(p.x() + forward * Math.cos(h) - side * Math.sin(h), p.y() + forward * Math.sin(h) + side * Math.cos(h), h + turn);
+            checkAgain = offCenter || turn != 0 || Math.abs(forward) > trustMove;
+            plannedForward = forward;
             measuring = false;
             phaseTimer.reset();
             drivePush = turnPush = strafePush = 0;
@@ -157,7 +176,12 @@ public class WallApproach {
         double forwardLeft = dx * Math.cos(h) + dy * Math.sin(h);
         double sideLeft = -dx * Math.sin(h) + dy * Math.cos(h);
         double turnLeft = Math.toDegrees(Math.atan2(Math.sin(moveTarget.heading() - h), Math.cos(moveTarget.heading() - h)));
-        boolean arrived = Math.abs(forwardLeft) < arrivedIn && Math.abs(sideLeft) < strafeTolerance && Math.abs(turnLeft) < arrivedDeg;
+        boolean arrived = Math.abs(forwardLeft) < arrivedIn && Math.abs(sideLeft) < arrivedSide && Math.abs(turnLeft) < arrivedDeg;
+        if (arrived && !checkAgain) {
+            wallDist -= plannedForward;
+            error -= plannedForward;
+            return finish(follower, Result.DONE);
+        }
         if (arrived || phaseTimer.seconds() > moveTimeoutSec) {
             startMeasuring(follower);
             return Result.RUNNING;
@@ -168,11 +192,11 @@ public class WallApproach {
         double leftSpeed = -v.vx * Math.sin(h) + v.vy * Math.cos(h);
         drivePush = push(drivePush, forwardLeft, arrivedIn, Math.abs(forwardSpeed), 1, dt);
         turnPush = push(turnPush, turnLeft, arrivedDeg, Math.abs(Math.toDegrees(v.omega)), 3, dt);
-        strafePush = push(strafePush, sideLeft, strafeTolerance, Math.abs(leftSpeed), 1, dt);
+        strafePush = push(strafePush, sideLeft, arrivedSide, Math.abs(leftSpeed), 1, dt);
 
         drivePower = atLeast(Range.clip(kpDrive * forwardLeft, -maxDrive, maxDrive), forwardLeft, arrivedIn, minPower + drivePush);
         turnPower = atLeast(Range.clip(kpTurn * turnLeft, -maxTurn, maxTurn), turnLeft, arrivedDeg, minTurn + turnPush);
-        strafePower = atLeast(Range.clip(kpStrafe * sideLeft, -maxStrafe, maxStrafe), sideLeft, strafeTolerance, minStrafe + strafePush);
+        strafePower = atLeast(Range.clip(kpStrafe * sideLeft, -maxStrafe, maxStrafe), sideLeft, arrivedSide, minStrafe + strafePush);
         follower.manual(drivePower, strafePower, turnPower);   // forward, left, ccw (robot-centric)
         return Result.RUNNING;
     }
@@ -189,6 +213,7 @@ public class WallApproach {
         telemetry.addData("Left / Right", "%.1f in / %.1f in", left, right);
         telemetry.addData("Wall", "%.1f in (%.1f to go)", wallDist, error);
         telemetry.addData("Angle", useAngle ? String.format("%.1f deg", angle) : "ignored (one sensor sees the flower)");
+        telemetry.addData("Flower shift", "%+.1f in (+ = left)", flowerShift);
         telemetry.addData("Power", "drive %.2f  strafe %.2f  turn %.2f", drivePower, strafePower, turnPower);
         telemetry.addData("Doing", measuring ? "measuring (standing still)" : "moving by odometry");
     }
@@ -249,6 +274,11 @@ public class WallApproach {
     // left, right, wall, toGo, angle, drivePower, strafePower, turnPower, bumper from the last update()
     public double[] snapshot() {
         return new double[]{left, right, wallDist, error, angle, drivePower, strafePower, turnPower, bumperToWall()};
+    }
+
+    // inches it slid left (+) or right (-) of pedro's spot to get on the flower
+    public double flowerShift() {
+        return flowerShift;
     }
 
     // bumper to wall from the last reading
