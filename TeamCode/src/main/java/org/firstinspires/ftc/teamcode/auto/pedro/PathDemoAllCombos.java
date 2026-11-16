@@ -9,8 +9,6 @@ import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
 import com.pedropathing.paths.Path;
-import com.pedropathing.paths.interpolator.Interpolator;
-import com.pedropathing.paths.interpolator.PiecewiseInterpolator;
 import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -79,11 +77,13 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double bumperToCenter = halfRobot;
     private static final boolean fixPoseAtWall = false;   // true = let the wall reading correct pedro's position after the adjust
     private static final double maxPoseFix = 4.0;   // ultrasonics disagree with pedro by more than this = don't trust them
+    private static final double handoff = 10;   // in. pedro stops this far short and the gentle driver does the rest, so pedro's overshoot can't reach a wall
     private static final double maxAdjust = 3.0;   // the adjust can't take it further than this from pedro's pickup spot
 
     private Follower follower;
     private BatteryDrive drive;
     private WallApproach sonar;
+    private final PointDrive pointDrive = new PointDrive();
     private boolean approaching = false;
     private String sonarResult = "-";
     private String stepNote = "";
@@ -311,14 +311,16 @@ public class PathDemoAllCombos extends LinearOpMode {
     private boolean swoopToRearShoot() {
         status = "Swooping to the rear";
         Pose target = mirrorIfBlue(rearShootPose);
-        return follow(curve(follower.pose(), mirrorIfBlue(swoopControl), target).constant(target.heading()));
+        if (!follow(curve(follower.pose(), mirrorIfBlue(swoopControl), target).constant(target.heading()))) return false;
+        return easeTo(target);
     }
 
     private boolean climbToRearFlower() {
         status = "Climbing to the rear flower";
         Pose target = mirrorIfBlue(rearFlowerLineup);
         Path path = curve(follower.pose(), mirrorIfBlue(climbControl1), mirrorIfBlue(climbControl2), target);
-        return follow(path.constant(target.heading()));
+        if (!follow(path.constant(target.heading()))) return false;
+        return easeTo(target);
     }
 
     private void park() {
@@ -329,8 +331,19 @@ public class PathDemoAllCombos extends LinearOpMode {
         driveTo(parkPose);
     }
 
+    // pedro does the long part fast, then the gentle driver eases it onto the spot. short moves are all gentle
     private boolean driveTo(Pose redTarget) {
-        return driveTo(redTarget, 0, 1);
+        Pose target = mirrorIfBlue(redTarget);
+        if (Math.abs(angleTo(target.heading(), follower.pose().heading())) > Math.toRadians(20) && !spinTo(target.heading())) return false;
+
+        Pose here = follower.pose();
+        double dist = here.distance(target);
+        if (dist > handoff + 6) {
+            double part = (dist - handoff) / dist;
+            Pose stopShort = new Pose(here.x() + part * (target.x() - here.x()), here.y() + part * (target.y() - here.y()), here.heading());
+            if (!follow(line(here, stopShort).constant(here.heading()))) return false;
+        }
+        return easeTo(target);
     }
 
     // drives there still facing the same way
@@ -338,15 +351,20 @@ public class PathDemoAllCombos extends LinearOpMode {
         return driveTo(redTarget.withHeading(mirrorIfBlue(follower.pose()).heading()));
     }
 
-    // spins in place. a 180 aims 90 deg ccw first so it can't flip between left and right
     private boolean turnTo(double redHeading) {
-        Pose spot = follower.pose();
-        double target = isBlue ? redHeading + Math.PI : redHeading;
-        if (Math.abs(angleTo(target, spot.heading())) > Math.toRadians(150)
-                && !spin(spot.withHeading(spot.heading() + Math.PI / 2), 30)) return false;
-        return spin(spot.withHeading(target), 4);
+        return spinTo(isBlue ? redHeading + Math.PI : redHeading);
     }
 
+    // spins in place. a 180 aims 90 deg ccw first so it can't flip between left and right
+    private boolean spinTo(double heading) {
+        Pose spot = follower.pose();
+        if (Math.abs(angleTo(heading, spot.heading())) > Math.toRadians(150)
+                && !spin(spot.withHeading(spot.heading() + Math.PI / 2), 30)) return false;
+        if (!spin(spot.withHeading(heading), 10)) return false;
+        return easeTo(spot.withHeading(heading));   // finishes the turn and puts it back on the spot if it drifted
+    }
+
+    // pedro's hold does the big part of a turn fast
     private boolean spin(Pose target, double closeEnoughDeg) {
         lastTarget = target;
         follower.hold(target);
@@ -360,26 +378,28 @@ public class PathDemoAllCombos extends LinearOpMode {
         return opModeIsActive();
     }
 
-    // the turn happens between turnStart and turnEnd (fractions of the path)
-    private boolean driveTo(Pose redTarget, double turnStart, double turnEnd) {
-        Pose here = follower.pose();
-        Pose target = mirrorIfBlue(redTarget);
-
-        // a 180 can go either way depending on sensor noise, so those always go ccw through the halfway heading
-        double turn = angleTo(target.heading(), here.heading());
-        if (turn < Math.toRadians(-170)) turn += 2 * Math.PI;
-        double halfway = here.heading() + turn / 2;
-
-        PiecewiseInterpolator heading = Interpolator.piecewise();
-        if (turnStart > 0) heading.until(turnStart, Interpolator.constant(here.heading()));
-        heading.until((turnStart + turnEnd) / 2, Interpolator.linear(here.heading(), halfway));
-        heading.until(turnEnd, Interpolator.linear(halfway, target.heading()));
-        if (turnEnd < 1) heading.until(1, Interpolator.constant(target.heading()));
-
-        return follow(line(here, target).heading(heading));
+    // slows down as it gets close and stops on the spot, see PointDrive. gives up after a bit so the auto never hangs
+    private boolean easeTo(Pose target) {
+        lastTarget = target;
+        pointDrive.start();
+        double limit = 1.5 + follower.pose().distance(target) / 8;
+        ElapsedTime time = new ElapsedTime();
+        boolean there = false;
+        while (opModeIsActive() && !there && !pointDrive.blocked() && time.seconds() < limit) {
+            if (outOfTime()) return false;
+            there = pointDrive.update(follower, target);
+            follower.update();
+            updateTelemetry();
+        }
+        if (!there) timesStuck++;
+        follower.stop();   // wheels off between moves no matter how it ended
+        follower.update();
+        Pose p = follower.pose();
+        stopError = String.format("%.1f in, %.0f deg", p.distance(target), Math.abs(Math.toDegrees(angleTo(target.heading(), p.heading()))));
+        return opModeIsActive();
     }
 
-    // no speed cap on purpose, capped paths only got ~0.2 power and the robot never started moving
+    // pedro at full speed for the long hauls. no speed cap on purpose, capped paths only got ~0.2 power and never started moving
     private boolean follow(Path path) {
         follower.follow(path);
         Pose end = path.endPose();
