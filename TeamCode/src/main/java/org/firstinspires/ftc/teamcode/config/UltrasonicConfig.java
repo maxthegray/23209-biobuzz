@@ -37,8 +37,9 @@ public final class UltrasonicConfig {
     // ---- 3. where to stop in front of a flower ----
     public static final double flowerFromWallIn = 3.0;   // guess, measure on a real field
     public static final double flowerReachIn = 2.4;   // top ring sticks out this far
-    public static final double clearanceIn = 2.2;   // don't touch the flower. the sensors sit about 1.1 in ahead of the frame (9 in from the pinpoint, frame is 7.875)
-    public static final double stopDistanceIn = flowerFromWallIn + flowerReachIn + clearanceIn;   // bumper to wall
+    public static final double frontMountsIn = 2.0;   // the sensor and limelight mounts stick out this far past the frame
+    public static final double clearanceIn = 1.0;   // gap left between the mounts and the flower
+    public static final double stopDistanceIn = flowerFromWallIn + flowerReachIn + frontMountsIn + clearanceIn;   // frame to wall
 
     // ---- 4. smoothing (see the comment at the top of sensors/UltrasonicSensor.java) ----
     public static final double defaultWindowSec = 0.2;   // average this many seconds of readings (2 sensor updates)
