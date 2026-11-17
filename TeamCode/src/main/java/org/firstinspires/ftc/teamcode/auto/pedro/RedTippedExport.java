@@ -16,6 +16,7 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.pedropathing.paths.interpolator.Interpolator;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 
 // straight from the visualizer export of red_tipped.pp, paths only (no waits for shooting/intake). full speed
 @Autonomous(name = "Red Tipped (visualizer export)", group = "teaching")
@@ -77,6 +78,7 @@ public class RedTippedExport extends LinearOpMode {
         follower = Constants.create(hardwareMap);
         follower.setPose(redtippedstart);
         follower.update();
+        FlightRecorder log = FlightRecorder.start(this, follower);   // saves the run to a file on the hub
 
         waitForStart();
         schedule(autoRoutine());
@@ -95,6 +97,7 @@ public class RedTippedExport extends LinearOpMode {
             }
 
             telemetry.update();
+            log.update();
         }
     }
 

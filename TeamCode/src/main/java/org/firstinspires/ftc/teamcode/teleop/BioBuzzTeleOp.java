@@ -5,6 +5,8 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
+
 @TeleOp(name = "Starter Drive", group = "teaching")
 public class BioBuzzTeleOp extends LinearOpMode {
     @Override
@@ -26,6 +28,8 @@ public class BioBuzzTeleOp extends LinearOpMode {
         frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        FlightRecorder log = FlightRecorder.start(this);   // saves the run to a file on the hub, see logging/FlightRecorder.java
 
         telemetry.addLine("Ready");
         telemetry.update();
@@ -51,6 +55,7 @@ public class BioBuzzTeleOp extends LinearOpMode {
             telemetry.addData("Strafe", "%.2f", strafe);
             telemetry.addData("Turn", "%.2f", turn);
             telemetry.update();
+            log.update();
         }
     }
 }

@@ -22,6 +22,7 @@ import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest;
 
 import java.util.ArrayList;
@@ -76,6 +77,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double maxAdjust = 3.0;   // the adjust can't take it further than this from pedro's pickup spot
 
     private Follower follower;
+    private FlightRecorder log;   // saves the run to a file on the hub, see logging/FlightRecorder.java
     private BatteryDrive drive;
     private FlowerApproachTest.WallApproach sonar;
     private boolean approaching = false;
@@ -105,6 +107,7 @@ public class PathDemoAllCombos extends LinearOpMode {
             sonar = null;   // not in the robot config, flowers just use pedro
         }
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
+        log = FlightRecorder.start(this, follower);
 
         while (opModeInInit()) {
             if (gamepad1.dpad_left) isBlue = false;
@@ -122,6 +125,7 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (sonar != null) sonar.showReadings(telemetry);
             else telemetry.addLine("Ultrasonics not in the config, flowers use pedro only");
             telemetry.update();
+            log.update();
         }
         if (isStopRequested()) return;
 
@@ -477,6 +481,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         String line = String.format("%-20s %4.1f s (at %4.1f) lag %3.0f", name, now - lastStepTime, now, worstLag);
         if (timesStuck > 0) line += " stuck " + timesStuck;
         stepLog.add(line + stepNote);
+        log.event("STEP " + name + stepNote);
         stepNote = "";
         lastStepTime = now;
         worstLag = 0;
@@ -503,6 +508,14 @@ public class PathDemoAllCombos extends LinearOpMode {
         telemetry.addData("Time", "%.1f s, park needs ~%.1f s", timer.seconds(), timeToPark());
         for (String line : stepLog) telemetry.addLine(line);
         telemetry.update();
+
+        // every loop in this opmode ends by calling this, so this is the once-per-loop spot for the recorder
+        log.put("Auto/status", status);
+        log.put("Auto/balls", balls);
+        log.put("Auto/batteryScale", drive.scale());
+        log.put("Auto/approaching", approaching);
+        if (approaching) sonar.log(log);
+        log.update();
     }
 
     private static Pose pose(double x, double y, double headingDeg) {

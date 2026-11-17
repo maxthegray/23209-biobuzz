@@ -5,7 +5,9 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 
 @TeleOp(name = "Starter Drive (30 in limit)", group = "teaching")
 public class BioBuzzTeleOpBut30In extends LinearOpMode {
@@ -36,6 +38,8 @@ public class BioBuzzTeleOpBut30In extends LinearOpMode {
         // Robot must be still for this; it takes about a quarter second.
         pinpoint.resetPosAndIMU();
         sleep(300);
+
+        FlightRecorder log = FlightRecorder.start(this);   // saves the run to a file on the hub, see logging/FlightRecorder.java
 
         telemetry.addLine("Ready");
         telemetry.update();
@@ -80,8 +84,15 @@ public class BioBuzzTeleOpBut30In extends LinearOpMode {
             telemetry.addData("Turn", "%.2f", turn);
             telemetry.addData("Distance", "%.1f / %.1f in", distanceTraveled, DISTANCE_LIMIT_INCHES);
             telemetry.update();
+
+            // pinpoint.update() above already read these, so this is no extra hub traffic. measured from where the
+            // robot started, not field coordinates
+            log.pose(x, y, pinpoint.getHeading(AngleUnit.RADIANS));
+            log.put("Drive/distanceTraveledIn", distanceTraveled);
+            log.update();
         }
 
+        log.event("LOCKED at " + DISTANCE_LIMIT_INCHES + " in");
         // Limit reached: stop the robot and ignore the gamepad for the rest of the OpMode.
         frontLeft.setPower(0);
         frontRight.setPower(0);
@@ -93,6 +104,7 @@ public class BioBuzzTeleOpBut30In extends LinearOpMode {
             telemetry.addData("Distance", "%.1f in", distanceTraveled);
             telemetry.addLine("Stop the OpMode to drive again.");
             telemetry.update();
+            log.update();
         }
     }
 }

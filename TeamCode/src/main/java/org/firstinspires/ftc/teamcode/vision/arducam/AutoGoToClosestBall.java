@@ -22,6 +22,7 @@ import org.firstinspires.ftc.vision.opencv.ColorBlobLocatorProcessor;
 import org.firstinspires.ftc.vision.opencv.ColorRange;
 import org.firstinspires.ftc.vision.opencv.ColorSpace;
 import org.firstinspires.ftc.vision.opencv.ImageRegion;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 
@@ -172,6 +173,7 @@ public class AutoGoToClosestBall extends LinearOpMode {
         ElapsedTime stopwatch = new ElapsedTime();
         ElapsedTime blabberTimer = new ElapsedTime();
         ElapsedTime sinceNewPic = new ElapsedTime();
+        FlightRecorder log = FlightRecorder.start(this);   // saves the run to a file on the hub, see logging/FlightRecorder.java
 
         double lastPicX = -1, lastPicR = -1;
         double heldSpin = 0, heldScoot = 0;
@@ -305,6 +307,14 @@ public class AutoGoToClosestBall extends LinearOpMode {
                 telemetry.addData("Eyeball", eyeballFrozen ? "locked" : "AUTO - colour will wander");
                 telemetry.update();
             }
+
+            log.put("Ball/seen", b != null);
+            log.put("Ball/errorPx", errorX);
+            log.put("Ball/radiusPx", radius);
+            log.put("Ball/turn", turn);
+            log.put("Ball/scoot", scoot);
+            log.put("Ball/wheelsHot", wheelsHot);
+            log.update();
         }
 
         frontLeft.setPower(0);

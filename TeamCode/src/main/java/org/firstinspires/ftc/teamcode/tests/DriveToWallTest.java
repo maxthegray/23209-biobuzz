@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
 
@@ -33,6 +34,7 @@ public class DriveToWallTest extends LinearOpMode {
         Follower follower = Constants.create(hardwareMap);
         WallApproach approach = new WallApproach(hardwareMap);   // uses UltrasonicCalibration, nothing overrides it here
         List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
+        FlightRecorder log = FlightRecorder.start(this, follower);   // saves the run to a file on the hub
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         double target = DEFAULT_TARGET_IN;
@@ -56,6 +58,9 @@ public class DriveToWallTest extends LinearOpMode {
             telemetry.addLine("Point the robot at the wall from 1-2 ft");
             telemetry.addLine("Press START, then HOLD A to drive");
             telemetry.update();
+            approach.log(log);
+            log.put("DriveToWall/targetIn", target);
+            log.update();
             sleep(20);
         }
 
@@ -108,6 +113,12 @@ public class DriveToWallTest extends LinearOpMode {
                 }
                 showFix();
                 telemetry.update();
+
+                approach.log(log);
+                log.put("DriveToWall/targetIn", stopAt);
+                log.put("DriveToWall/driving", driving);
+                log.put("DriveToWall/result", result == null ? "-" : result.toString());
+                log.update();
             }
         } finally {
             follower.manual(0, 0, 0);

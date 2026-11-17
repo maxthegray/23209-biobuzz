@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.tests;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Velocity;
 import com.qualcomm.hardware.lynx.LynxModule;
@@ -11,12 +12,14 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationServer;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession.Phase;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.CalibrationSession.Stage;
 import org.firstinspires.ftc.teamcode.tests.flowerdash.Command;
+import org.firstinspires.ftc.teamcode.tuning.Tunables;
 import org.json.JSONArray;
 
 import java.util.List;
@@ -28,7 +31,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 //
 // there's also a website, open the address shown on the driver hub from a laptop on the robot's wifi.
 // it does everything the gamepad does, plus saves and plots every reading and lets you download CSVs.
-// it runs on its own port (8765+), separate from the robot controller page (8080) and Pedro's Panels (8001)
+// it runs on its own port (8765+), separate from the robot controller page (8080), Panels (8001) and
+// Pedro's AutoTune page (10158, with its websocket on 12649)
 @TeleOp(name = "Flower Approach Test (ultrasonic)", group = "test")
 public class FlowerApproachTest extends LinearOpMode {
 
@@ -58,6 +62,7 @@ public class FlowerApproachTest extends LinearOpMode {
         follower = Constants.create(hardwareMap);
         approach = new WallApproach(hardwareMap);
         List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
+        FlightRecorder log = FlightRecorder.start(this, follower);   // saves the run to a file on the hub
         session = new CalibrationSession(tapeDistances, settleSec, recordSec, goodEnough, jumpy,
                 WallApproach.stopDistance, tooFar, WallApproach.defaultSpacing, WallApproach.defaultSetback);
         session.setPastedFix(WallApproach.pastedFix());
@@ -92,6 +97,11 @@ public class FlowerApproachTest extends LinearOpMode {
 
                 if (canDrive) follower.update();
                 telemetry.update();
+
+                approach.log(log);
+                log.put("FlowerApproach/stage", stage.toString());
+                log.put("FlowerApproach/driving", driving);
+                log.update();
                 if (stage != Stage.DRIVE) sleep(20);   // the drive check runs full speed like before, the tuning depends on it
             }
         } finally {
@@ -159,7 +169,8 @@ public class FlowerApproachTest extends LinearOpMode {
                 boolean sane = session.fitsSane();
                 usingFix = c.args.optBoolean("fix", true) && sane;
                 double[] k = usingFix ? session.correction() : WallApproach.pastedFix();   // not this run's fix = keep the one pasted in the code
-                approach.useCorrection(k[0], k[1], k[2], k[3]);
+                if (usingFix) approach.useCorrection(k[0], k[1], k[2], k[3]);
+                else approach.useCalibration();
                 result = null;
                 driveNote = "";
                 session.enterDrive(usingFix, k);
@@ -368,6 +379,7 @@ public class FlowerApproachTest extends LinearOpMode {
 
     // average of the two sensors = distance to the wall, difference = how crooked we are
     // drives through pedro's manual mode so pedro keeps tracking position
+    @Configurable
     public static class WallApproach {
 
         public enum Result { RUNNING, DONE, FAILED }
@@ -382,31 +394,41 @@ public class FlowerApproachTest extends LinearOpMode {
         static final double clearance = 1.0;   // don't touch the flower
         public static final double stopDistance = flowerFromWall + flowerReach + clearance;   // bumper to wall
 
-        static final double kpDrive = 0.06;
-        static final double kpTurn = 0.015;
+        // the public static ones can be changed live in Panels (http://192.168.43.1:8001), see tuning/Tunables.java.
+        // the final ones are limits and stay put, so a typo in Panels can't send the robot into the wall
+        public static double kpDrive = 0.06;
+        public static double kpTurn = 0.015;
         static final double maxDrive = 0.25;   // sensors only update ~10x a second
         static final double maxTurn = 0.15;
-        static final double minPower = 0.07;
-        static final double kpStrafe = 0.06;
+        public static double minPower = 0.07;
+        public static double kpStrafe = 0.06;
         static final double maxStrafe = 0.2;
-        static final double minStrafe = 0.05;
-        static final double minTurn = 0.05;
-        static final double pushRate = 0.6;   // power per second added while a direction is stuck, low powers can't beat the wheel friction
-        static final double maxPush = 0.25;
+        public static double minStrafe = 0.05;
+        public static double minTurn = 0.05;
+        public static double pushRate = 0.6;   // power per second added while a direction is stuck, low powers can't beat the wheel friction
+        public static double maxPush = 0.25;
+        static final double hardLimit = 0.5;   // no power goes past this whatever the numbers above are
 
-        static final double distanceTolerance = 0.5;
-        static final double angleTolerance = 2.0;
-        static final double strafeTolerance = 0.75;
-        static final double settleSec = 0.3;   // sensors only update every 100 ms, so wait for a few fresh readings
+        public static double distanceTolerance = 0.5;
+        public static double angleTolerance = 2.0;
+        public static double strafeTolerance = 0.75;
+        public static double settleSec = 0.3;   // sensors only update every 100 ms, so wait for a few fresh readings
         static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower
         static final double timeoutSec = 4.0;
+
+        // remembers the numbers above as "what the code says". has to stay below them
+        static {
+            Tunables.track(WallApproach.class);
+        }
 
         // the fix lives in UltrasonicCalibration.java, edit it there. corrected = scale * reading + offset
         public static double[] pastedFix() {
             return UltrasonicCalibration.values();
         }
-        private double leftScaleNow = UltrasonicCalibration.leftScale, leftOffsetNow = UltrasonicCalibration.leftOffset;
-        private double rightScaleNow = UltrasonicCalibration.rightScale, rightOffsetNow = UltrasonicCalibration.rightOffset;
+        // false = use UltrasonicCalibration as it is right now (so a change in Panels shows up straight away).
+        // true = useCorrection() gave this run its own fix
+        private boolean ownFix = false;
+        private double leftScaleNow, leftOffsetNow, rightScaleNow, rightOffsetNow;
         static final double minReading = 1.0;   // in. under this is a loose signal wire (it reads as 0.8), not a real wall
 
         private final Ultrasonic.HrlvShortRange leftSensor, rightSensor;
@@ -417,6 +439,7 @@ public class FlowerApproachTest extends LinearOpMode {
         private double target = stopDistance;
 
         private double left, right, wallDist, error, angle, drivePower, strafePower, turnPower;
+        private double lastRawLeft = Double.NaN, lastRawRight = Double.NaN;
         private boolean useAngle = true;
 
         public WallApproach(HardwareMap hardwareMap) {
@@ -484,6 +507,10 @@ public class FlowerApproachTest extends LinearOpMode {
             drivePower = atLeast(Range.clip(kpDrive * error, -maxDrive, maxDrive), error, distanceTolerance, minPower + drivePush);
             turnPower = -atLeast(Range.clip(kpTurn * angle, -maxTurn, maxTurn), angle, angleTolerance, minTurn + turnPush);
             strafePower = atLeast(Range.clip(kpStrafe * leftError, -maxStrafe, maxStrafe), leftError, strafeTolerance, minStrafe + strafePush);
+            // the minimums + push can go past the max above on purpose (to get unstuck), but never past this
+            drivePower = Range.clip(drivePower, -hardLimit, hardLimit);
+            turnPower = Range.clip(turnPower, -hardLimit, hardLimit);
+            strafePower = Range.clip(strafePower, -hardLimit, hardLimit);
 
             follower.manual(drivePower, strafePower, turnPower);   // forward, left, ccw (robot-centric)
             return Result.RUNNING;
@@ -523,23 +550,55 @@ public class FlowerApproachTest extends LinearOpMode {
             leftOffsetNow = leftOffset;
             rightScaleNow = rightScale;
             rightOffsetNow = rightOffset;
+            ownFix = true;
+        }
+
+        // back to the fix in UltrasonicCalibration.java
+        public void useCalibration() {
+            ownFix = false;
+        }
+
+        private double fixLeft(double raw) {
+            return ownFix ? leftScaleNow * raw + leftOffsetNow : UltrasonicCalibration.left(raw);
+        }
+
+        private double fixRight(double raw) {
+            return ownFix ? rightScaleNow * raw + rightOffsetNow : UltrasonicCalibration.right(raw);
         }
 
         // inches straight from the datasheet formula, no fix
         public double rawLeft() {
-            return leftSensor.getDistanceMm() / 25.4;
+            return lastRawLeft = leftSensor.getDistanceMm() / 25.4;
         }
 
         public double rawRight() {
-            return rightSensor.getDistanceMm() / 25.4;
+            return lastRawRight = rightSensor.getDistanceMm() / 25.4;
+        }
+
+        // puts the last readings and what update() last decided into the flight recorder. doesn't read the hub again
+        public void log(FlightRecorder log) {
+            log.put("Ultrasonic/leftSignalVolts", leftSensor.lastSignalVoltage());
+            log.put("Ultrasonic/leftVccVolts", leftSensor.lastVccVoltage());
+            log.put("Ultrasonic/rightSignalVolts", rightSensor.lastSignalVoltage());
+            log.put("Ultrasonic/rightVccVolts", rightSensor.lastVccVoltage());
+            log.put("Ultrasonic/leftRawIn", lastRawLeft);
+            log.put("Ultrasonic/rightRawIn", lastRawRight);
+            log.put("Ultrasonic/leftIn", fixLeft(lastRawLeft));
+            log.put("Ultrasonic/rightIn", fixRight(lastRawRight));
+            log.put("WallApproach/wallIn", wallDist);
+            log.put("WallApproach/toGoIn", error);
+            log.put("WallApproach/angleDeg", angle);
+            log.put("WallApproach/drivePower", drivePower);
+            log.put("WallApproach/strafePower", strafePower);
+            log.put("WallApproach/turnPower", turnPower);
         }
 
         public double leftNow() {
-            return leftScaleNow * rawLeft() + leftOffsetNow;
+            return fixLeft(rawLeft());
         }
 
         public double rightNow() {
-            return rightScaleNow * rawRight() + rightOffsetNow;
+            return fixRight(rawRight());
         }
 
         // from the last reading, doesn't read the hub again

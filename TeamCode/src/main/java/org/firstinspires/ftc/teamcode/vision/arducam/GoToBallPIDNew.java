@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.vision.arducam;
 
 import android.util.Size;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -18,6 +19,8 @@ import org.firstinspires.ftc.vision.opencv.ColorBlobLocatorProcessor;
 import org.firstinspires.ftc.vision.opencv.ColorRange;
 import org.firstinspires.ftc.vision.opencv.ColorSpace;
 import org.firstinspires.ftc.vision.opencv.ImageRegion;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
+import org.firstinspires.ftc.teamcode.tuning.Tunables;
 import org.opencv.core.Scalar;
 
 import java.util.List;
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeUnit;
  * Camera runs during INIT so you can aim it before anything moves.
  */
 
+@Configurable
 @TeleOp(name = "Go to Ball PID (new)", group = "teaching")
 public class GoToBallPIDNew extends LinearOpMode {
     // false = no controller needed, just goes on start
@@ -64,22 +68,30 @@ public class GoToBallPIDNew extends LinearOpMode {
     private static final Scalar yellowHigh = new Scalar(255, 180, 100);
 
 
-    private static double kP = 0.0040 / zoominess;
-    private static double kD = 0.0006 / zoominess;
+    // the public static ones can be changed live in Panels (http://192.168.43.1:8001), see tuning/Tunables.java.
+    // if the driver hub says COPY INTO CODE for one of these, the new number replaces everything after the =
+    // (the "/ zoominess" too). the two speed limits are final so a typo in Panels can't make it spin flat out
+    public static double kP = 0.0040 / zoominess;
+    public static double kD = 0.0006 / zoominess;
 
     // PD for now. I on a camera loop just makes it overshoot. unstickPower covers what I would do
-    private static double kI = 0.0;
+    public static double kI = 0.0;
 
     private static final double closeEnoughPx = 8 * zoominess;
-    private static final double unstickPower = 0.10;        // below this the wheels just buzz
+    public static double unstickPower = 0.10;        // below this the wheels just buzz
     private static final double spinSpeedLimit = 0.45;
-    private static final double windupLeash = 0.15;
+    public static double windupLeash = 0.15;
 
     // bigger ball on screen = closer ball
     private static final double snuggleRadiusPx = 55 * zoominess;
-    private static final double kpScoot = 0.006 / zoominess;
+    public static double kpScoot = 0.006 / zoominess;
     private static final double scootSpeedLimit = 0.35;
     private static final double aimedEnoughPx = 40 * zoominess;
+
+    // remembers the numbers above as "what the code says". has to stay below them
+    static {
+        Tunables.track(GoToBallPIDNew.class);
+    }
 
     // false if the camera refused manual exposure
     private boolean eyeballFrozen = false;
@@ -161,6 +173,7 @@ public class GoToBallPIDNew extends LinearOpMode {
         ElapsedTime stopwatch = new ElapsedTime();
         ElapsedTime blabberTimer = new ElapsedTime();
         ElapsedTime sinceNewPic = new ElapsedTime();
+        FlightRecorder log = FlightRecorder.start(this);   // saves the run to a file on the hub, see logging/FlightRecorder.java
 
         double lastPicX = -1, lastPicR = -1;
         double heldSpin = 0, heldScoot = 0;
@@ -311,6 +324,14 @@ public class GoToBallPIDNew extends LinearOpMode {
                 telemetry.addData("Eyeball", eyeballFrozen ? "locked" : "AUTO - colour will wander");
                 telemetry.update();
             }
+
+            log.put("Ball/seen", b != null);
+            log.put("Ball/errorPx", errorX);
+            log.put("Ball/radiusPx", radius);
+            log.put("Ball/turn", turn);
+            log.put("Ball/scoot", scoot);
+            log.put("Ball/wheelsHot", wheelsHot);
+            log.update();
         }
 
         frontLeft.setPower(0);

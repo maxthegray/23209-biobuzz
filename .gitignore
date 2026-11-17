@@ -85,3 +85,9 @@ lint/tmp/
 .project
 .classpath
 .settings/
+
+# flight recorder logs pulled off the robot (make pull-logs)
+robot-logs/
+
+# python tools
+__pycache__/

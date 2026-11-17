@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.tests.flowerdash;
 
+import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.follower.Follower;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -8,10 +9,12 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 import org.firstinspires.ftc.teamcode.tests.FlowerApproachTest.WallApproach;
 import org.firstinspires.ftc.teamcode.tests.Ultrasonic;
 import org.firstinspires.ftc.teamcode.tests.UltrasonicCalibration;
+import org.firstinspires.ftc.teamcode.tuning.Tunables;
 
 import java.util.List;
 
@@ -20,27 +23,36 @@ import java.util.List;
 // readings use the fix in UltrasonicCalibration.java: corrected = scale * raw + offset
 // sign convention: left sensor counts negative, right counts positive. difference = right - left.
 // right reads farther (difference > 0) = positive turn, left reads farther (difference < 0) = negative turn.
+@Configurable
 @Autonomous(name = "UltrasonicAlignment", group = "test")
 public class UltrasonicAutoAlignment extends LinearOpMode {
 
-    static final double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 3.6 deg with 16 in spacing
+    // the public static ones can be changed live in Panels (http://192.168.43.1:8001), see tuning/Tunables.java.
+    // the final ones are limits and stay put. turn power is always clipped to maxTurn, whatever the others are
+    public static double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 3.6 deg with 16 in spacing
     static final double maxTurn = 0.35;
-    static final double minTurn = 0.08;   // starting minimum, the push below adds to it until the robot actually turns
-    static final double pushRate = 0.4;   // power per second added while the robot is stuck (not turning)
-    static final double maxPush = 0.25;
-    static final double stuckOmega = 0.05;   // rad/s, slower than this counts as not turning
-    static final double tolerance = 0.3;   // in, close enough to call it the same
-    static final double settleSec = 0.3;   // sensors update every 100 ms, wait for a few fresh readings
+    public static double minTurn = 0.08;   // starting minimum, the push below adds to it until the robot actually turns
+    public static double pushRate = 0.4;   // power per second added while the robot is stuck (not turning)
+    public static double maxPush = 0.25;
+    public static double stuckOmega = 0.05;   // rad/s, slower than this counts as not turning
+    public static double tolerance = 0.3;   // in, close enough to call it the same
+    public static double settleSec = 0.3;   // sensors update every 100 ms, wait for a few fresh readings
     static final double timeoutSec = 8.0;   // give up if it still isn't aligned after this long
     static final double maxSkew = 6.0;   // bigger difference than this = one sensor is probably seeing the flower, not the wall
     static final double minReading = 1.0;   // in, under this is a loose signal wire
     static final double maxReading = 30.0;   // in, farther than this the wall probably isn't in front of both sensors
+
+    // remembers the numbers above as "what the code says". has to stay below them
+    static {
+        Tunables.track(UltrasonicAutoAlignment.class);
+    }
 
     @Override
     public void runOpMode() {
         Follower follower = Constants.create(hardwareMap);
         WallApproach sensors = new WallApproach(hardwareMap);   // just for the calibrated readings
         List<LynxModule> hubs = Ultrasonic.manualBulkReads(hardwareMap);
+        FlightRecorder log = FlightRecorder.start(this, follower);   // saves the run to a file on the hub
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         // show live readings during init too, the robot doesn't move until START
@@ -49,6 +61,8 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
             showReadings(sensors);
             telemetry.addLine("Press START, the robot will align itself");
             telemetry.update();
+            sensors.log(log);
+            log.update();
             sleep(20);
         }
 
@@ -115,6 +129,13 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
                 telemetry.addData("Time", "%.1f / %.0f s", runTime.seconds(), timeoutSec);
                 telemetry.addLine(status);
                 telemetry.update();
+
+                sensors.log(log);
+                log.put("Align/diffIn", diff);
+                log.put("Align/turnPower", turn);
+                log.put("Align/pushPower", push);
+                log.put("Align/status", status);
+                log.update();
             }
         } finally {
             follower.manual(0, 0, 0);

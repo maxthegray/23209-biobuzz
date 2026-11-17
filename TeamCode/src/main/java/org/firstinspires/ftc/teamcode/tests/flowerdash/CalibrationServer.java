@@ -14,11 +14,11 @@ import java.util.Queue;
 import fi.iki.elonen.NanoHTTPD;
 
 // tiny web server just for this test. It is its own server on its own port and never touches the robot controller's
-// web server (8080) or the Pedro Pathing Panels dashboard (8001), and it shuts down when the opmode ends.
+// web server (8080), Panels (8001) or Pedro's AutoTune page (10158 + 12649), and it shuts down when the opmode ends.
 // No login: it can only be reached from the robot's own network.
 public class CalibrationServer extends NanoHTTPD {
 
-    // none of these are 8001 (Panels) or 8080 (robot controller)
+    // none of these are 8080 (robot controller), 8001 (Panels) or 10158 / 12649 (Pedro AutoTune)
     private static final int[] PORTS = {8765, 8766, 8767, 8768, 8769, 8770};
 
     private final Context context;
