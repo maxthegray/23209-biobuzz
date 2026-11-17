@@ -7,11 +7,11 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 // drives to a spot with plain odometry feedback. the closer it gets the slower it goes, and it never uses full power
-// pedro paths go full power and brake at the end, which stutters on short moves and overshoots into walls
+// pedro paths go full power and brake at the end, which stutters on short moves and overshoots into walls, so path demo uses this for every move
 public class PointDrive {
 
-    static final double kpDrive = 0.11, kdDrive = 0.018;   // power per inch, power per in/s (the second one is the brake)
-    static final double kpStrafe = 0.14, kdStrafe = 0.021;
+    static final double kpDrive = 0.11, kdDrive = 0.022;   // power per inch, power per in/s (the second one is the brake)
+    static final double kpStrafe = 0.14, kdStrafe = 0.026;
     static final double kpTurn = 0.02, kdTurn = 0.0026;   // power per degree, power per deg/s
     static final double maxDrive = 0.65, maxTurn = 0.7;
     static final double minPower = 0.06, minTurn = 0.05;
@@ -23,12 +23,14 @@ public class PointDrive {
 
     private final ElapsedTime sinceUpdate = new ElapsedTime();
     private double drivePush, strafePush, turnPush;
-    private double blockedTime;
+    private double blockedTime, nearTime;
+    private double lastForward, lastLeft, lastTurn;
 
     public void start() {
         sinceUpdate.reset();
         drivePush = strafePush = turnPush = 0;
-        blockedTime = 0;
+        blockedTime = nearTime = 0;
+        lastForward = lastLeft = lastTurn = 0;
     }
 
     // pushing as hard as it's allowed and still not moving = it's against a wall, stop trying
@@ -62,10 +64,22 @@ public class PointDrive {
 
         boolean there = Math.hypot(forward, left) < tolIn && Math.abs(turn) < tolDeg;
         boolean stopped = Math.hypot(forwardSpeed, leftSpeed) < 2 && Math.abs(turnSpeed) < 10;
-        if (there && (stopped || !mustStop)) {
+        // hanging around just outside the tolerance counts too. chasing the last half inch makes it rock back and forth
+        boolean near = Math.hypot(forward, left) < 2 * tolIn && Math.abs(turn) < 2 * tolDeg;
+        boolean slow = Math.hypot(forwardSpeed, leftSpeed) < 6 && Math.abs(turnSpeed) < 20;
+        nearTime = near && slow ? nearTime + dt : 0;
+        if ((there && (stopped || !mustStop)) || nearTime > 0.5) {
             follower.manual(0, 0, 0);
             return true;
         }
+
+        // it went past the spot, so the extra push that got it unstuck would now shove it back just as hard
+        if (forward * lastForward < 0) drivePush = 0;
+        if (left * lastLeft < 0) strafePush = 0;
+        if (turn * lastTurn < 0) turnPush = 0;
+        lastForward = forward;
+        lastLeft = left;
+        lastTurn = turn;
 
         // each direction only has to get inside its share of the tolerance
         double inTol = tolIn * 0.6;

@@ -1,13 +1,9 @@
 package org.firstinspires.ftc.teamcode.auto.pedro;
 
-import static com.pedropathing.api.Paths.curve;
-
 import com.pedropathing.algorithm.Foresight;
 import com.pedropathing.drivetrain.DrivePowers;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
-import com.pedropathing.math.Velocity;
-import com.pedropathing.paths.Path;
 import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.localizers.PinpointLocalizer;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -24,7 +20,7 @@ import org.firstinspires.ftc.teamcode.vision.ultrasonic.WallApproach;
 import java.util.ArrayList;
 import java.util.List;
 
-// all 4 autos (red/blue, tipped/not tipped). no shooter or intake yet so those are just waits
+// all 6 autos (red/blue, audience start tipped/not tipped, rear start). no shooter or intake yet so those are just waits
 // poses are red side in pedro visualizer coords, blue gets mirrored
 
 //@Disabled
@@ -45,8 +41,8 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final Pose gardenTurnSpot = new Pose(36, 30);   // spin around out here, nowhere near a wall
     private static final Pose gardenLineup = pose(6 + halfRobot, 24, -90);   // 6 in off the side wall so it can't slide into it
     private static final Pose gardenPickup = pose(3 + halfRobot, 3 + halfRobot, -90);   // 3 in off both walls
-    private static final Pose gardenBackup = pose(22, 24, -90);
-    private static final Pose swoopControl = new Pose(22, 116);
+    private static final Pose gardenBackup = new Pose(24, 30);   // these two are pass-through spots on the way round to the rear, it doesn't stop at them
+    private static final Pose swoopCorner = new Pose(22, 106);
 
     // flowers sit at 46.75 along their wall (manual). the sensors are only 7.5 in apart and a flower is ~6.3 in wide,
     // so being even an inch off center puts a sensor on the flower
@@ -55,8 +51,13 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final Pose sideFlowerPickup = pose(8.3 + halfRobot, flowerCenter, 180);   // bumper 8.3 in off (2.9 from the flower), the ultrasonics do the rest
     private static final Pose rearFlowerLineup = pose(flowerCenter, fieldSize - 14.5 - halfRobot, 90);   // bumper 14.5 in off the wall
     private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - 8.3 - halfRobot, 90);
-    private static final Pose climbControl1 = new Pose(18, 14);
-    private static final Pose climbControl2 = new Pose(18, 118);
+    private static final Pose climbCorner1 = new Pose(24, 30);   // pass-through spots that take it round the left of the hive
+    private static final Pose climbCorner2 = new Pose(20, 104);
+
+    // rear start: back on the rear wall, side 3 in clear of the rear flower, facing the hive. shoots, then the flower is right there
+    private static final Pose rearStartPose = pose(flowerCenter + 3.15 + 3 + halfRobot, fieldSize - halfRobot, -90);
+    private static final Pose rearStartTurnSpot = new Pose(62, 112);   // turns around out here, clear of the wall and the flower
+    private static final Pose sideCorner = new Pose(16, 102);   // pass-through spot between the rear shot and the side flower, keeps it wide of the hive
 
     // private static final Pose climbControl2 = new Pose(18, 118);
 
@@ -67,7 +68,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double stopAt = 29.5;
     private static final double avgSpeed = 30;   // in/s, rough guess for how long parking takes
     private static final double parkBuffer = 1.5;
-    private static final double lastShotDrive = 3.0;   // s, rough time to get to the rear shot and turn around
+    private static final double passRadius = 14;   // in. this close to a pass-through spot counts, then it heads for the next one without slowing
 
     private static final long shotMs = 700;
     private static final long intakeMs = 1500;
@@ -92,12 +93,12 @@ public class PathDemoAllCombos extends LinearOpMode {
     private final ElapsedTime timer = new ElapsedTime();
     private boolean isBlue = false;
     private boolean hiveTipped = true;
+    private boolean rearStart = false;
     private boolean parking = false;
     private int balls = 4;
     private String status = "Starting";
     private final List<String> stepLog = new ArrayList<>();
     private double lastStepTime = 0;
-    private double worstLag = 0;
     private int timesStuck = 0;
     private Pose lastTarget;
     private String stopError = "-";
@@ -120,10 +121,16 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (gamepad1.dpad_up) hiveTipped = true;
             if (gamepad1.dpad_down) hiveTipped = false;
 
+            if (gamepad1.left_bumper) rearStart = false;
+            if (gamepad1.right_bumper) rearStart = true;
+
             telemetry.addData("Alliance", isBlue ? "Blue" : "Red");
-            telemetry.addData("Hive", hiveTipped ? "Tipped" : "Not tipped");
-            telemetry.addLine("Dpad left/right = alliance, up/down = tipped");
-            telemetry.addLine(isBlue ? "Back against the rear wall, centered on the blue hive"
+            telemetry.addData("Start", rearStart ? "Far wall (shoot, then the flower next to it)" : "Hive wall");
+            telemetry.addData("Hive", rearStart ? "not used for this start" : hiveTipped ? "Tipped" : "Not tipped");
+            telemetry.addLine("Dpad left/right = alliance, up/down = tipped, LB/RB = start wall");
+            if (rearStart) telemetry.addLine(isBlue ? "Back against the audience wall, facing the blue hive, side 3 in from the flower"
+                    : "Back against the rear wall, facing the red hive, side 3 in from the flower");
+            else telemetry.addLine(isBlue ? "Back against the rear wall, centered on the blue hive"
                     : "Back against the audience wall, centered on the red hive");
             drive.readBattery();
             telemetry.addData("Battery", "%.1f V%s", drive.voltage, drive.voltage < lowBattery ? "  LOW, swap it" : "");
@@ -134,8 +141,9 @@ public class PathDemoAllCombos extends LinearOpMode {
         if (isStopRequested()) return;
 
         timer.reset();
-        follower.setPose(mirrorIfBlue(startPose));
-        lastTarget = mirrorIfBlue(startPose);
+        Pose start = mirrorIfBlue(rearStart ? rearStartPose : startPose);
+        follower.setPose(start);
+        lastTarget = start;
 
         if (!runPlan()) logStep("Out of time");
         park();
@@ -152,9 +160,14 @@ public class PathDemoAllCombos extends LinearOpMode {
         if (!step("Shoot preloads", shoot())) return false;
         if (!step("Tip check", checkTip())) return false;
 
-        if (hiveTipped) {
+        if (rearStart) {
+            if (!step("Rear flower", pickUpFlower(rearStartTurnSpot, rearFlowerPickup, 12))) return false;   // 12 in off the wall before it turns
+            if (!step("Back to rear shot", backToRearShot())) return false;
+            if (!step("Shoot flower balls", shoot())) return false;
+            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 30, sideCorner))) return false;   // turns once it is past the hive
+        } else if (hiveTipped) {
             if (!step("Garden lineup", lineUpForGarden())) return false;
-            if (!step("Garden", intakeAndBackUp(gardenPickup, gardenBackup))) return false;
+            if (!step("Garden", intakeFromGarden())) return false;
             if (!step("Swoop to rear", swoopToRearShoot())) return false;
             if (!step("Shoot garden balls", shoot())) return false;
             if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, 0))) return false;
@@ -162,18 +175,18 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 7))) return false;   // 7 in clear of the wall before it turns
             if (!step("Back to shoot", backToAudienceShot())) return false;
             if (!step("Shoot again", shoot())) return false;
-            if (!step("Climb to rear flower", climbToRearFlower())) return false;
-            if (!step("Rear flower", pickUpFlower(null, rearFlowerPickup, 0))) return false;
+            if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, 0, climbCorner1, climbCorner2))) return false;
         }
 
         // only skips the last shot if there isn't time for even one ball. otherwise it shoots what it can and leaves in time to park
-        double shotNeeds = lastShotDrive + shotMs / 1000.0 + parkTimeFrom(rearShootPose);
+        double driveTime = 2 + mirrorIfBlue(follower.pose()).distance(rearShootPose) / 35;
+        double shotNeeds = driveTime + shotMs / 1000.0 + parkTimeFrom(rearShootPose);
         if (autoLength - timer.seconds() < shotNeeds) {
             logStep(String.format("No time for last shot (needs %.0f s)", shotNeeds));
             return true;
         }
         if (!step("Back to rear shot", backToRearShot())) return false;
-        return step("Shoot flower balls", shoot());
+        return step("Shoot last balls", shoot());
     }
 
     private boolean shoot() {
@@ -194,9 +207,9 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     // one move from wherever it is to the flower, turning on the way. it only goes past the lineup spot once it's facing the flower
     // then the ultrasonics adjust. if they give up it just stays where pedro put it
-    private boolean pickUpFlower(Pose lineup, Pose pickup, double turnAfter) {
+    private boolean pickUpFlower(Pose lineup, Pose pickup, double turnAfter, Pose... passThrough) {
         status = "To the flower";
-        if (!glideTo(pickup, lineup, turnAfter, false)) return false;
+        if (!glideTo(pickup, lineup, turnAfter, false, passThrough)) return false;
         if (!adjustAtFlower(pickup)) return false;
         status = "Intaking (simulated)";
         if (!waitMs(intakeMs)) return false;
@@ -211,7 +224,6 @@ public class PathDemoAllCombos extends LinearOpMode {
             stepNote = " pedro";
             return true;
         }
-        if (follower.holding() && !settle()) return false;   // pedro's path ends with it still rolling, stop first
         Pose pickup = mirrorIfBlue(redPickup);
         status = "Ultrasonic adjust";
         approaching = true;
@@ -290,34 +302,27 @@ public class PathDemoAllCombos extends LinearOpMode {
     //   stableAverage3 =
     // }
 
+    // from the rear flower it's right there. from the side flower it goes up the left side first
     private boolean backToRearShot() {
         status = "Back to the rear shot";
+        boolean fromSide = mirrorIfBlue(follower.pose()).y() < sideCorner.y();
+        if (fromSide) return glideTo(rearShootPose, null, 4, false, sideCorner);
         return glideTo(rearShootPose, null, 5, false);   // backs off the flower 5 in before it turns
     }
 
-    private boolean intakeAndBackUp(Pose pickup, Pose backup) {
+    private boolean intakeFromGarden() {
         status = "Driving in";
-        if (!glideTo(pickup, null, 0, false)) return false;
+        if (!glideTo(gardenPickup, null, 0, false)) return false;
         status = "Intaking (simulated)";
         if (!waitMs(intakeMs)) return false;
         balls = maxBalls;
-        status = "Backing up";
-        return glideTo(backup, null, 0, true);
+        return true;
     }
 
+    // one move from the garden round the left of the hive to the rear shot
     private boolean swoopToRearShoot() {
         status = "Swooping to the rear";
-        Pose target = mirrorIfBlue(rearShootPose);
-        if (!follow(curve(follower.pose(), mirrorIfBlue(swoopControl), target).constant(target.heading()))) return false;
-        return easeTo(target, false);
-    }
-
-    private boolean climbToRearFlower() {
-        status = "Climbing to the rear flower";
-        Pose target = mirrorIfBlue(rearFlowerLineup);
-        Path path = curve(follower.pose(), mirrorIfBlue(climbControl1), mirrorIfBlue(climbControl2), target);
-        if (!follow(path.constant(target.heading()))) return false;
-        return easeTo(target, true);   // it drives straight in from here
+        return glideTo(rearShootPose, null, 0, false, gardenBackup, swoopCorner);
     }
 
     // parks facing whichever way is closest, turning around first just burns time
@@ -330,36 +335,49 @@ public class PathDemoAllCombos extends LinearOpMode {
         glideTo(parkPose.withHeading(facing), null, 0, false);
     }
 
-    // every straight move is one continuous motion: it drives and turns together and slows down as it gets close, see PointDrive
+    // every move is one continuous motion: it drives and turns together and slows down as it gets close, see PointDrive
     // turnAfter = inches it drives before it starts turning, so the corners have room to swing
     // standoff = where it heads while it's still turning (null = straight to the target). it only goes on to the target once it's square
+    //   a standoff right in front of the target (flower lineups) also has to be reached first, so the last bit is always straight in and slow
     // rough = just passing through, so close is good enough and it doesn't wait to stop
-    private boolean glideTo(Pose redTarget, Pose redStandoff, double turnAfter, boolean rough) {
-        return glide(mirrorIfBlue(redTarget), redStandoff == null ? null : mirrorIfBlue(redStandoff), turnAfter, rough);
-    }
-
-    private boolean easeTo(Pose target, boolean rough) {
-        return glide(target, null, 0, rough);
-    }
-
-    private boolean glide(Pose target, Pose standoff, double turnAfter, boolean rough) {
+    // passThrough = spots to go by on the way, in order. it never slows for these
+    private boolean glideTo(Pose redTarget, Pose redStandoff, double turnAfter, boolean rough, Pose... passThrough) {
+        Pose[] spots = new Pose[passThrough.length];
+        for (int i = 0; i < spots.length; i++) spots[i] = mirrorIfBlue(passThrough[i]);
+        Pose target = mirrorIfBlue(redTarget);
+        Pose standoff = redStandoff == null ? null : mirrorIfBlue(redStandoff);
         lastTarget = target;
+
         Pose start = follower.pose();
-        double dist = start.distance(target);
+        double dist = 0;
+        Pose from = start;
+        for (Pose spot : spots) {
+            dist += from.distance(spot);
+            from = spot;
+        }
+        dist += from.distance(target);
         double turn = Math.abs(angleTo(target.heading(), start.heading()));
         boolean bigTurn = turn > Math.toRadians(150);   // a 180 goes ccw through 90 first so it can't flip between left and right
         turnAfter = Math.min(turnAfter, dist / 2);
         double limit = 2 + dist / 12 + Math.toDegrees(turn) / 60;   // gives up after this so the auto never hangs
+
         pointDrive.start();
         ElapsedTime time = new ElapsedTime();
+        int next = 0;
+        boolean passedStandoff = standoff == null || standoff.distance(target) > 10;
         boolean there = false;
         while (opModeIsActive() && !there && !pointDrive.blocked() && time.seconds() < limit) {
             if (outOfTime()) return false;
             Pose p = follower.pose();
+            while (next < spots.length && p.distance(spots[next]) < passRadius) next++;
             double turnLeft = Math.abs(angleTo(target.heading(), p.heading()));
             boolean finalHeading = p.distance(start) >= turnAfter && !(bigTurn && turnLeft > Math.toRadians(100));
             double facing = finalHeading ? target.heading() : p.distance(start) < turnAfter ? start.heading() : start.heading() + Math.PI / 2;
-            if (standoff != null && turnLeft > Math.toRadians(15)) pointDrive.updateRough(follower, standoff.withHeading(facing));
+            if (next < spots.length) pointDrive.updateRough(follower, spots[next].withHeading(facing));
+            else if (standoff != null && (turnLeft > Math.toRadians(15) || !passedStandoff)) {
+                pointDrive.updateRough(follower, standoff.withHeading(facing));
+                if (p.distance(standoff) < 6) passedStandoff = true;
+            }
             else if (rough || !finalHeading) there = pointDrive.updateRough(follower, target.withHeading(facing)) && finalHeading;
             else there = pointDrive.update(follower, target);
             follower.update();
@@ -375,56 +393,8 @@ public class PathDemoAllCombos extends LinearOpMode {
         return opModeIsActive();
     }
 
-    // pedro at full speed for the two long curves. no speed cap on purpose, capped paths only got ~0.2 power and never started moving
-    private boolean follow(Path path) {
-        follower.follow(path);
-        Pose end = path.endPose();
-        lastTarget = end;
-        double closest = Double.MAX_VALUE;
-        ElapsedTime sinceCloser = new ElapsedTime();
-        while (opModeIsActive()) {
-            if (outOfTime()) return false;
-            follower.update();
-            if (!follower.following()) return true;   // pedro switches to holding when the path ends
-
-            // pedro won't push harder if the robot stalls, so catch it here
-            double left = distanceLeft(end);
-            if (left < closest - 1) {
-                closest = left;
-                sinceCloser.reset();
-            }
-            if (sinceCloser.seconds() > 0.75) return getUnstuck(end);
-
-            Object headingError = follower.debug().algorithm().get("headingError");
-            if (headingError instanceof Double) worstLag = Math.max(worstLag, Math.abs(Math.toDegrees((Double) headingError)));
-            updateTelemetry();
-        }
-        return false;
-    }
-
-    // hold pushes harder the further off it is, so it gets the robot moving again
-    private boolean getUnstuck(Pose end) {
-        timesStuck++;
-        follower.hold(end);
-        ElapsedTime wait = new ElapsedTime();
-        while (opModeIsActive() && wait.seconds() < 1.5) {
-            if (outOfTime()) return false;
-            follower.update();
-            if (distanceLeft(end) < 1.5) break;
-            updateTelemetry();
-        }
-        return opModeIsActive();
-    }
-
-    // inches to go, plus 1 in for every ~6 deg of turning left
-    private double distanceLeft(Pose end) {
-        Pose p = follower.pose();
-        return p.distance(end) + 10 * Math.abs(angleTo(end.heading(), p.heading()));
-    }
-
     // cuts the wheels and waits. still calls update() so the pinpoint keeps tracking
     private boolean waitMs(long ms) {
-        if (follower.holding() && !settle()) return false;
         follower.stop();
         ElapsedTime wait = new ElapsedTime();
         while (opModeIsActive() && wait.milliseconds() < ms) {
@@ -433,22 +403,6 @@ public class PathDemoAllCombos extends LinearOpMode {
             drive.readBattery();   // wheels are off so drive() isn't running, keep the number fresh anyway
             updateTelemetry();
         }
-        return opModeIsActive();
-    }
-
-    // pedro ends paths a little early, so hold till it actually stops or it coasts past
-    private boolean settle() {
-        ElapsedTime wait = new ElapsedTime();
-        while (opModeIsActive() && wait.seconds() < 1) {
-            if (outOfTime()) return false;
-            follower.update();
-            Velocity v = follower.velocity();
-            boolean stopped = Math.hypot(v.vx, v.vy) < 2 && Math.abs(v.omega) < 0.2;
-            if (stopped && (distanceLeft(lastTarget) < 1.5 || wait.seconds() > 0.4)) break;
-            updateTelemetry();
-        }
-        Pose p = follower.pose();
-        stopError = String.format("%.1f in, %.0f deg", p.distance(lastTarget), Math.abs(Math.toDegrees(angleTo(lastTarget.heading(), p.heading()))));
         return opModeIsActive();
     }
 
@@ -478,13 +432,12 @@ public class PathDemoAllCombos extends LinearOpMode {
 
     private void logStep(String name) {
         double now = timer.seconds();
-        // lag = most the heading fell behind the path during that step, stuck = how many times it had to get unstuck
-        String line = String.format("%-20s %4.1f s (at %4.1f) lag %3.0f", name, now - lastStepTime, now, worstLag);
+        // stuck = it hit something or ran out of time on a move in that step
+        String line = String.format("%-20s %4.1f s (at %4.1f)", name, now - lastStepTime, now);
         if (timesStuck > 0) line += " stuck " + timesStuck;
         stepLog.add(line + stepNote);
         stepNote = "";
         lastStepTime = now;
-        worstLag = 0;
         timesStuck = 0;
     }
 
