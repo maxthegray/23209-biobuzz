@@ -10,7 +10,7 @@ The flight recorder writes a TUNED event for every tunable number that is differ
 the code: at the start of each run, whenever one changes, and again at the end. So the
 newest log always has the whole list. One event looks like
 
-    TUNED UltrasonicCalibration.java UltrasonicCalibration.leftScale 1.2649 -> 1.31
+    TUNED UltrasonicConfig.java UltrasonicConfig.leftScale 1.2649 -> 1.31
 
 (file, class.field, what the code said -> what it was changed to; the same number on both
 sides means it was put back). For each one this finds the line in the code and says what

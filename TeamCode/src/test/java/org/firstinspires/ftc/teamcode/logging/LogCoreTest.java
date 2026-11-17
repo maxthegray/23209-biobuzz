@@ -361,7 +361,7 @@ public class LogCoreTest {
                 core.record(new String[]{"hubs/control/currentAmps", "hubs/control/volts", "battery"},
                         new double[]{6.0, 12.8 - 0.1 * t, 12.8 - 0.1 * t}, 3);
             }
-            if (i == 200) core.event("TUNED UltrasonicCalibration.java UltrasonicCalibration.leftScale 1.2649 -> 1.31");
+            if (i == 200) core.event("TUNED UltrasonicConfig.java UltrasonicConfig.leftScale 1.2649 -> 1.31");
         }
         core.event("stop");
         core.close();

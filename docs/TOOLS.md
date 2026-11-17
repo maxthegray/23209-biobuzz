@@ -124,10 +124,11 @@ init is negative.
 Panels is a web page served by the robot at **http://192.168.43.1:8001** while the robot
 app is running. Numbers marked `@Configurable` can be changed there with no redeploy.
 
-Tunable now: ultrasonic calibration (`UltrasonicCalibration`: `leftScale`, `leftOffset`,
+Tunable now: ultrasonic calibration (`config/UltrasonicConfig`: `leftScale`, `leftOffset`,
 `rightScale`, `rightOffset`), the wall approach and alignment gains
-(`FlowerApproachTest.WallApproach`, `UltrasonicAutoAlignment`) and the ball PID gains
-(`GoToBallPIDNew`). Safety limits (power caps, timeouts) are deliberately not tunable.
+(`mechanisms/WallApproach`, `UltrasonicAutoAlignment`), the ball PID gains
+(`config/BallVisionConfig`) and the teleop speed (`config/DriveConfig`). Safety limits (power caps,
+timeouts) are deliberately not tunable.
 
 **Panels changes are never saved.** To keep them:
 

@@ -17,6 +17,7 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
+import org.firstinspires.ftc.teamcode.config.HardwareNames;
 import org.firstinspires.ftc.teamcode.tuning.Tunables;
 
 import java.io.File;
@@ -57,7 +58,7 @@ import java.util.Map;
 //   - anything that goes wrong in here turns the recorder off and the opmode keeps running
 // the one thing it does to the hubs: a hub that has bulk caching OFF is switched to AUTO, so reading the 4 motor
 // speeds is one hub read instead of 4. AUTO never gives stale values. hubs already in MANUAL (see
-// Ultrasonic.manualBulkReads) are left alone.
+// BulkReads.manual) are left alone.
 //
 // channel names are what the tools in tools/ look for, see docs/LOGGING.md before renaming one
 public final class FlightRecorder {
@@ -68,8 +69,9 @@ public final class FlightRecorder {
     static final String LOG_DIR = "/sdcard/FIRST/logs";
     static final int MAX_LOG_FILES = 30;
 
-    // must match pedro/Constants.java. order is what the tools expect: left front, right front, left rear, right rear
-    private static final String[] DRIVE_MOTORS = {"frontLeftMotor", "frontRightMotor", "backLeftMotor", "backRightMotor"};
+    // order is what the tools expect: left front, right front, left rear, right rear
+    private static final String[] DRIVE_MOTORS = {HardwareNames.FRONT_LEFT_MOTOR, HardwareNames.FRONT_RIGHT_MOTOR,
+            HardwareNames.BACK_LEFT_MOTOR, HardwareNames.BACK_RIGHT_MOTOR};
 
     private static final long MOTOR_INTERVAL_NS = 20_000_000L;   // motors 50 times a second at most
     private static final long SLOW_READ_NS = 500_000L;   // a read this slow went to the hub instead of the cache

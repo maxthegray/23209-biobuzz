@@ -94,7 +94,7 @@ class TunedTest(unittest.TestCase):
         got = tuned.tuned(ROOT, logs[0])
         self.assertEqual(1, len(got))
         self.assertEqual("leftScale", got[0]["field"])
-        self.assertTrue(got[0]["path"].endswith("tests/UltrasonicCalibration.java"))
+        self.assertTrue(got[0]["path"].endswith("config/UltrasonicConfig.java"))
         self.assertIsNotNone(got[0]["line"])
 
 

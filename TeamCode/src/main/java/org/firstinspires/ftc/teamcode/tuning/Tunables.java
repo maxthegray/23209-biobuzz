@@ -33,8 +33,8 @@ public final class Tunables {
 
     // one number that is different from the code right now
     public static final class Change {
-        public final String file;    // UltrasonicCalibration.java
-        public final String owner;   // UltrasonicCalibration, or WallApproach for a class inside another class
+        public final String file;    // UltrasonicConfig.java
+        public final String owner;   // UltrasonicConfig, or WallApproach for a class inside another class
         public final String field;   // leftScale
         public final String code;    // what the code says
         public final String now;     // what it is right now

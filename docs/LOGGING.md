@@ -88,7 +88,7 @@ puts them in a folder, and end the name with the unit (`In`, `Deg`, `Volts`, `Px
   on the background thread, one hub every quarter second.
 - Motor speed comes out of the hub's bulk read. A hub that had bulk caching OFF is switched
   to AUTO when the recorder starts, so the four speeds are one hub read, at most 50 times a
-  second. AUTO never gives stale values. Hubs in MANUAL (`Ultrasonic.manualBulkReads`) are
+  second. AUTO never gives stale values. Hubs in MANUAL (`BulkReads.manual`) are
   left alone, and there the read is free because the opmode already did it.
 - Motor power is free while the motor is being driven. For a motor nobody has set in half a
   second it is one hub read, and the recorder does at most one of those per loop.

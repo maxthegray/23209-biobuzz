@@ -112,10 +112,11 @@ public class TunablesTest {
     @Test
     public void theRobotsTunableClassesAreTrackedAndStartOutMatchingTheCode() throws Exception {
         String[] names = {
-                "org.firstinspires.ftc.teamcode.tests.UltrasonicCalibration",
-                "org.firstinspires.ftc.teamcode.tests.FlowerApproachTest$WallApproach",
-                "org.firstinspires.ftc.teamcode.tests.flowerdash.UltrasonicAutoAlignment",
-                "org.firstinspires.ftc.teamcode.vision.arducam.GoToBallPIDNew",
+                "org.firstinspires.ftc.teamcode.config.UltrasonicConfig",
+                "org.firstinspires.ftc.teamcode.config.BallVisionConfig",
+                "org.firstinspires.ftc.teamcode.config.DriveConfig",
+                "org.firstinspires.ftc.teamcode.mechanisms.WallApproach",
+                "org.firstinspires.ftc.teamcode.opmodes.tests.flowerdash.UltrasonicAutoAlignment",
         };
         for (String name : names) {
             Class<?> c = Class.forName(name);   // loading it runs its static block
@@ -127,16 +128,16 @@ public class TunablesTest {
                         change.owner.equals(c.getSimpleName()));
             }
         }
-        org.firstinspires.ftc.teamcode.tests.UltrasonicCalibration.leftScale += 0.05;
+        org.firstinspires.ftc.teamcode.config.UltrasonicConfig.leftScale += 0.05;
         try {
-            List<Tunables.Change> changes = of("UltrasonicCalibration");
+            List<Tunables.Change> changes = of("UltrasonicConfig");
             assertEquals(1, changes.size());
-            assertEquals("UltrasonicCalibration.java", changes.get(0).file);
+            assertEquals("UltrasonicConfig.java", changes.get(0).file);
             assertEquals("leftScale", changes.get(0).field);
         } finally {
-            org.firstinspires.ftc.teamcode.tests.UltrasonicCalibration.leftScale -= 0.05;
+            org.firstinspires.ftc.teamcode.config.UltrasonicConfig.leftScale -= 0.05;
         }
-        assertTrue(of("UltrasonicCalibration").isEmpty());
+        assertTrue(of("UltrasonicConfig").isEmpty());
     }
 
     @Test

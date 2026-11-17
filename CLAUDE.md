@@ -32,11 +32,14 @@ Robot code is in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`:
 
 | Folder | What's in it |
 |---|---|
-| `teleop/` | Starter Drive teleops |
-| `auto/pedro/` | Pedro autos (`PathDemoAllCombos`, `RedTippedExport`) |
-| `tests/` | test opmodes; `Ultrasonic` (sensor class + bulk-read helpers), `UltrasonicCalibration` |
-| `tests/flowerdash/` | the flower dash: a small web page served by the robot on port 8765+ |
-| `vision/arducam/` | ball finding with the webcam |
+| `config/` | **the numbers students edit**: `HardwareNames`, `UltrasonicConfig` (calibration, geometry, limits), `BallVisionConfig`, `DriveConfig`. See `config/README.md` |
+| `sensors/` | `UltrasonicSensor` (one MaxBotix sensor, raw distance), `BulkReads` |
+| `mechanisms/` | `WallApproach` (drive up to a wall on the ultrasonics), `MecanumMotors` (drive motor setup) |
+| `opmodes/teleop/` | Starter Drive teleops |
+| `opmodes/auto/pedro/` | Pedro autos (`PathDemoAllCombos`, `RedTippedExport`) |
+| `opmodes/tests/` | test opmodes (`FlowerApproachTest`, `DriveToWallTest`, `UltrasonicReadout`, ...) |
+| `opmodes/tests/flowerdash/` | the flower dash: a small web page served by the robot on port 8765+ |
+| `opmodes/vision/` | ball finding with the webcam |
 | `pedro/` | `Constants.java` (drive + Pinpoint + follower tuning), Pedro's own tuners |
 | `logging/` | flight recorder |
 | `tuning/` | `Tunables`: tells you what to copy back after live tuning |
@@ -44,7 +47,7 @@ Robot code is in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`:
 Outside the robot code: `tools/` (deploy scripts, log tools, BuzzScope), `docs/LOGGING.md`,
 `TeamCode/src/test/` (laptop tests), `TeamCode/src/main/assets/flower_dash/` (the web page).
 
-Hardware names in the robot config: `frontLeftMotor`, `frontRightMotor`, `backLeftMotor`,
+Hardware names in the robot config (use the constants in `config/HardwareNames.java`): `frontLeftMotor`, `frontRightMotor`, `backLeftMotor`,
 `backRightMotor`, `shooter`, `pinpoint`, `limelight`, `Webcam 1`, `ultrasonic_left_signal`,
 `ultrasonic_left_vcc`, `ultrasonic_right_signal`, `ultrasonic_right_vcc`.
 
@@ -53,14 +56,17 @@ on 12649), 8765-8770 flower dash.
 
 ## How code is written here
 
-- One opmode is one `LinearOpMode` class with its numbers at the top. There is no subsystem
-  framework. Don't add one unless asked (see "For later").
+- One opmode is one `LinearOpMode` class with its own numbers at the top. Numbers shared by
+  several opmodes go in a `config/` class. Shared code goes in `sensors/` or `mechanisms/` as
+  plain classes; there is no subsystem framework. Don't add one unless asked (see "For later").
+- Mecanum math stays written out in each opmode, so students can read it; `MecanumMotors` only
+  does setup.
 - Comments are short, lowercase, plain words, and say why. Put them above the line or after
   it with three spaces: `static final double maxTurn = 0.35;   // why this number`.
   No Javadoc blocks in new code.
 - Units go in the name or the comment: `stopAtIn`, `settleSec`, `// in`, `// rad/s`.
-- Opmodes that read sensors from the hub call `Ultrasonic.manualBulkReads(hardwareMap)` once
-  and `Ultrasonic.clearBulkCache(hubs)` at the top of every loop. Forgetting the clear means
+- Opmodes that read sensors from the hub call `BulkReads.manual(hardwareMap)` once
+  and `BulkReads.clear(hubs)` at the top of every loop. Forgetting the clear means
   readings never change.
 - Anything that drives the robot from a test stops the motors in a `finally` block.
 - Keep the dead-man habit in test opmodes: the robot only moves while a button is held.
@@ -117,7 +123,7 @@ When the user says they tuned something in Panels and wants to keep it:
 
 1. `make pull-logs 1`, then `python3 tools/logs/tuned.py --json`.
 2. For `copy` entries, edit that line: replace the old number with the new one.
-3. For `expr` entries the line is a formula (`0.0040 / zoominess`); replace the whole right
+3. For `expr` entries the line is a formula (`0.0040 / pixelScale`); replace the whole right
    side with the new number and say so.
 4. `stale` or `lost`: don't guess. Show the user what the log says and what the code says.
 5. `make build`, then tell the user to `make deploy`.
@@ -134,13 +140,9 @@ Panels changes are never saved on the robot. The code is the only place tuning i
 
 ## For later
 
-- **Subsystems.** Once several opmodes share the same mechanism code (drive, shooter,
-  intake), suggest moving each mechanism into its own class with one `update()` and its own
-  log channels. `WallApproach` inside `FlowerApproachTest` is already used by four opmodes
-  and is the first candidate to move to its own file. A scaffolding agent for new subsystems
-  is worth adding at that point.
-- **Shared ball gains.** `GoToBallPIDNew` and `AutoGoToClosestBall` each have their own copy
-  of the PID numbers; only the first is tunable in Panels.
+- **Subsystems.** `mechanisms/` holds plain shared classes now (`WallApproach`,
+  `MecanumMotors`). When a shooter or intake gets shared code, add it there the same way, with
+  its own log channels. A scaffolding agent for new mechanisms is worth adding at that point.
 - **Loop cost of the recorder** has not been measured on the robot. Starter Drive and the
   ball opmodes are the ones to check, because the recorder adds a hub read there.
 - **EGM plugin.** `/egm:egm-drift-report` checks that this file and `docs/` still match the

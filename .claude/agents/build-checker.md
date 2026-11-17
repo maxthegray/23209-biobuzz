@@ -34,7 +34,7 @@ If it fails, list each compiler error once:
 
 ```
 BUILD FAILED: 2 errors
-TeamCode/src/main/java/org/firstinspires/ftc/teamcode/tests/DriveToWallTest.java:57: cannot find symbol: variable aproach
+TeamCode/src/main/java/org/firstinspires/ftc/teamcode/opmodes/tests/DriveToWallTest.java:57: cannot find symbol: variable aproach
 TeamCode/src/main/java/org/firstinspires/ftc/teamcode/logging/FlightRecorder.java:140: incompatible types: String cannot be converted to double
 ```
 
