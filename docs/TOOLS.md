@@ -64,7 +64,9 @@ Good to know:
 
 Every opmode with `FlightRecorder` in it saves one file per run on the hub:
 `/sdcard/FIRST/logs/<OpMode>-<date>-<time>-<n>.wpilog` (newest 30 are kept). It is
-already in the teleops, the ultrasonic opmodes, the ball opmodes and the Pedro autos.
+already in the teleops, the ultrasonic opmodes, the two ball-chasing opmodes, `Path Demo` and
+`Red Tipped`. Not yet in: `AutoTestingPedro`, `OtherAutoTest`, `LimelightHiveCheck`,
+`GoToBallPIDLearningTest`, `ShooterVelocityTest`, `DriveMotorSpeedTest`, `VisionDetectYellow`.
 
 To add it to a new opmode:
 
@@ -112,10 +114,11 @@ Logs also open in AdvantageScope (File → Open Log).
 ```bash
 make analyze                                                          # newest log
 python3 tools/logs/analyze_wpilog.py --json robot-logs/<file>         # machine-readable
-python3 tools/logs/analyze_wpilog.py --channel Ultrasonic/leftIn,WallApproach/toGoIn
+python3 tools/logs/analyze_wpilog.py --json --channel Ultrasonic/leftIn,WallApproach/toGoIn
 ```
 
-Prints loop time, battery and the event timeline, and any channels you ask for. This is
+Prints loop time, battery and the event timeline. `--channel` adds the channels you ask for,
+but only together with `--json` (without it the option is ignored). This is
 also what Claude uses to answer "what happened in that run?". Times count from `start`;
 init is negative.
 
@@ -156,8 +159,8 @@ See the comment at the top of `tuning/Tunables.java`.
 | `deploy` skill | "deploy this", "put it on the robot" | runs `make deploy` and explains HOT or FULL |
 | `build-checker` agent | "does it build?" | runs `make build` and lists errors as `file:line` |
 | `dependency-verifier` agent | "can we update X?" | checks a library version exists before any gradle change. Never edits |
-| save my tuning | "I tuned this in Panels, keep it" | pulls the log, runs `tuned.py`, edits the code lines |
-| what happened | "why did that run stop?" | pulls and analyzes the newest log |
+| save my tuning (a procedure in `CLAUDE.md`, not a skill) | "I tuned this in Panels, keep it" | pulls the log, runs `tuned.py`, edits the code lines |
+| what happened (a procedure in `CLAUDE.md`, not a skill) | "why did that run stop?" | pulls and analyzes the newest log |
 
 `CLAUDE.md` holds the rules Claude follows here: new opmodes get the recorder, tunable
 numbers go in Panels, gradle changes need your OK first, and nothing is committed or

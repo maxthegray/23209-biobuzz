@@ -341,7 +341,7 @@ only to `127.0.0.1`, exposes an allowlist of assets, and accepts same-origin
 local requests. No cloud hosting or build step is needed.
 
 ```sh
-python3 -m unittest tools/logs/test_analyze_wpilog.py tools/buzzscope/test_log_viewer.py tools/buzzscope/test_traction.py tools/buzzscope/test_battery.py
+python3 -m unittest tools/logs/test_analyze_wpilog.py tools/buzzscope/test_log_viewer.py tools/buzzscope/test_traction.py tools/buzzscope/test_battery.py tools/logs/test_tuned.py
 node --test tools/buzzscope/viewer/core.test.mjs
 ```
 
