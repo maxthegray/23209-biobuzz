@@ -33,35 +33,40 @@ public class PathDemoAllCombos extends LinearOpMode {
     // the robot is 40 x 40 cm (15.75 in), pinpoint in the middle, so the center is 7.875 in from each edge
     private static final double halfRobot = 7.875;
 
+    // the limelight and ultrasonic mounts stick out 2 in past the front of the frame, so the front needs that much more room than the sides and back
+    private static final double frontMounts = 2.0;
+    private static final double frontReach = halfRobot + frontMounts;
+
     private static final Pose startPose = pose(hiveX, halfRobot, 90);   // back flush against the wall
     private static final Pose audienceShootPose = pose(hiveX, 5 + halfRobot, 90);   // 5 in off the wall so it doesn't scrape
     private static final Pose rearShootPose = pose(hiveX, 116, -90);
     private static final Pose audienceStandoff = pose(hiveX, 21, 90);   // if it's still turning it waits out here, not by the wall
 
     private static final Pose gardenTurnSpot = new Pose(36, 30);   // spin around out here, nowhere near a wall
-    private static final Pose gardenLineup = pose(6 + halfRobot, 24, -90);   // 6 in off the side wall so it can't slide into it
-    private static final Pose gardenPickup = pose(3 + halfRobot, 3 + halfRobot, -90);   // 3 in off both walls
+    private static final Pose gardenLineup = pose(6 + halfRobot, 27, -90);   // 6 in off the side wall so it can't slide into it
+    private static final Pose gardenPickup = pose(3 + halfRobot, 4 + frontReach, -90);   // side 3 in off the side wall, front mounts 4 in off the audience wall
     private static final Pose gardenBackup = new Pose(24, 30);   // these two are pass-through spots on the way round to the rear, it doesn't stop at them
     private static final Pose swoopCorner = new Pose(22, 106);
 
     // flowers sit at 46.75 along their wall (manual). the sensors are only 7.5 in apart and a flower is ~6.3 in wide,
     // so being even an inch off center puts a sensor on the flower
     private static final double flowerCenter = 46.75;
-    private static final Pose sideFlowerLineup = pose(15.4 + halfRobot, flowerCenter, 180);   // bumper 15.4 in off the wall
-    private static final Pose sideFlowerPickup = pose(8.3 + halfRobot, flowerCenter, 180);   // bumper 8.3 in off (2.9 from the flower), the ultrasonics do the rest
-    private static final Pose rearFlowerLineup = pose(flowerCenter, fieldSize - 14.5 - halfRobot, 90);   // bumper 14.5 in off the wall
-    private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - 8.3 - halfRobot, 90);
+    // a flower's front is 5.4 in off the wall. these are frame-to-wall distances, the mounts are 2 in closer than that
+    private static final Pose sideFlowerLineup = pose(17 + halfRobot, flowerCenter, 180);   // frame 17 in off the wall
+    private static final Pose sideFlowerPickup = pose(10.4 + halfRobot, flowerCenter, 180);   // frame 10.4 in off, so the mounts are 3 in from the flower. the ultrasonics do the last 2 in
+    private static final Pose rearFlowerLineup = pose(flowerCenter, fieldSize - 17 - halfRobot, 90);
+    private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - 10.4 - halfRobot, 90);
     private static final Pose climbCorner1 = new Pose(24, 30);   // pass-through spots that take it round the left of the hive
     private static final Pose climbCorner2 = new Pose(20, 104);
 
     // rear start: back on the rear wall, side 3 in clear of the rear flower, facing the hive. shoots, then the flower is right there
     private static final Pose rearStartPose = pose(flowerCenter + 3.15 + 3 + halfRobot, fieldSize - halfRobot, -90);
     private static final Pose rearStartTurnSpot = new Pose(62, 112);   // turns around out here, clear of the wall and the flower
-    private static final Pose sideCorner = new Pose(16, 102);   // pass-through spot between the rear shot and the side flower, keeps it wide of the hive
+    private static final Pose sideCorner = new Pose(16, 112);   // pass-through spot between the rear shot and the side flower. high up so the front mounts clear the hive corner
 
     // private static final Pose climbControl2 = new Pose(18, 118);
 
-    private static final Pose parkPose = pose(4 + halfRobot, 108, -90);   // 4 in off the side wall
+    private static final Pose parkPose = pose(4 + frontReach, 108, -90);   // 4 in off the side wall even if the front is facing it
     private static final Pose parkWaypoint = new Pose(24, 40);   // straight line from down here would hit the hive or the side flower
 
     private static final double autoLength = 30;
@@ -94,6 +99,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private boolean isBlue = false;
     private boolean hiveTipped = true;
     private boolean rearStart = false;
+    private boolean loose = false;
     private boolean parking = false;
     private int balls = 4;
     private String status = "Starting";
@@ -164,7 +170,7 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Rear flower", pickUpFlower(rearStartTurnSpot, rearFlowerPickup, 12))) return false;   // 12 in off the wall before it turns
             if (!step("Back to rear shot", backToRearShot())) return false;
             if (!step("Shoot flower balls", shoot())) return false;
-            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 30, sideCorner))) return false;   // turns once it is past the hive
+            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 40, sideCorner))) return false;   // turns once it is past the hive
         } else if (hiveTipped) {
             if (!step("Garden lineup", lineUpForGarden())) return false;
             if (!step("Garden", intakeFromGarden())) return false;
@@ -172,7 +178,7 @@ public class PathDemoAllCombos extends LinearOpMode {
             if (!step("Shoot garden balls", shoot())) return false;
             if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, 0))) return false;
         } else {
-            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 7))) return false;   // 7 in clear of the wall before it turns
+            if (!step("Side flower", pickUpFlower(sideFlowerLineup, sideFlowerPickup, 12))) return false;   // 12 in along before it turns, so the corners clear the wall
             if (!step("Back to shoot", backToAudienceShot())) return false;
             if (!step("Shoot again", shoot())) return false;
             if (!step("Rear flower", pickUpFlower(rearFlowerLineup, rearFlowerPickup, 0, climbCorner1, climbCorner2))) return false;
@@ -282,12 +288,12 @@ public class PathDemoAllCombos extends LinearOpMode {
     // heads for the turn spot while it turns around, then on to the lineup without stopping
     private boolean lineUpForGarden() {
         status = "Lining up for the garden";
-        return glideTo(gardenLineup, gardenTurnSpot, 7, true);
+        return glideTo(gardenLineup, gardenTurnSpot, 12, true);
     }
 
     private boolean backToAudienceShot() {
         status = "Back to shoot";
-        return glideTo(audienceShootPose, audienceStandoff, 4, false);   // backs off the flower 4 in before it turns
+        return glideTo(audienceShootPose, audienceStandoff, 6, false);   // backs off the flower 6 in before it turns
     }
     // private boolean backToAudienceShot() {
     //   status = "Back to rear shotting";
@@ -306,13 +312,13 @@ public class PathDemoAllCombos extends LinearOpMode {
     private boolean backToRearShot() {
         status = "Back to the rear shot";
         boolean fromSide = mirrorIfBlue(follower.pose()).y() < sideCorner.y();
-        if (fromSide) return glideTo(rearShootPose, null, 4, false, sideCorner);
-        return glideTo(rearShootPose, null, 5, false);   // backs off the flower 5 in before it turns
+        if (fromSide) return glideTo(rearShootPose, null, 6, false, sideCorner);
+        return glideTo(rearShootPose, null, 7, false);   // backs off the flower 7 in before it turns
     }
 
     private boolean intakeFromGarden() {
         status = "Driving in";
-        if (!glideTo(gardenPickup, null, 0, false)) return false;
+        if (!glideLoose(gardenPickup)) return false;
         status = "Intaking (simulated)";
         if (!waitMs(intakeMs)) return false;
         balls = maxBalls;
@@ -332,7 +338,7 @@ public class PathDemoAllCombos extends LinearOpMode {
         Pose here = mirrorIfBlue(follower.pose());
         double facing = Math.round(here.heading() / (Math.PI / 2)) * (Math.PI / 2);
         if (here.y() < parkWaypoint.y()) glideTo(parkWaypoint.withHeading(facing), null, 0, true);
-        glideTo(parkPose.withHeading(facing), null, 0, false);
+        glideLoose(parkPose.withHeading(facing));
     }
 
     // every move is one continuous motion: it drives and turns together and slows down as it gets close, see PointDrive
@@ -341,6 +347,14 @@ public class PathDemoAllCombos extends LinearOpMode {
     //   a standoff right in front of the target (flower lineups) also has to be reached first, so the last bit is always straight in and slow
     // rough = just passing through, so close is good enough and it doesn't wait to stop
     // passThrough = spots to go by on the way, in order. it never slows for these
+    // for spots right by a wall. within 1.5 in is fine there, pushing for the last half inch just grinds it into the wall
+    private boolean glideLoose(Pose redTarget) {
+        loose = true;
+        boolean ok = glideTo(redTarget, null, 0, false);
+        loose = false;
+        return ok;
+    }
+
     private boolean glideTo(Pose redTarget, Pose redStandoff, double turnAfter, boolean rough, Pose... passThrough) {
         Pose[] spots = new Pose[passThrough.length];
         for (int i = 0; i < spots.length; i++) spots[i] = mirrorIfBlue(passThrough[i]);
@@ -379,7 +393,7 @@ public class PathDemoAllCombos extends LinearOpMode {
                 if (p.distance(standoff) < 6) passedStandoff = true;
             }
             else if (rough || !finalHeading) there = pointDrive.updateRough(follower, target.withHeading(facing)) && finalHeading;
-            else there = pointDrive.update(follower, target);
+            else there = loose ? pointDrive.updateLoose(follower, target) : pointDrive.update(follower, target);
             follower.update();
             updateTelemetry();
         }

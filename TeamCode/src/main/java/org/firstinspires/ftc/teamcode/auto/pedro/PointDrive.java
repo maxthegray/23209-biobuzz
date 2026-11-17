@@ -42,6 +42,11 @@ public class PointDrive {
         return update(follower, target, closeIn, closeDeg, true);
     }
 
+    // close is good enough but it does stop. for spots by a wall
+    public boolean updateLoose(Follower follower, Pose target) {
+        return update(follower, target, roughIn, roughDeg, true);
+    }
+
     // close is good enough and it doesn't wait to stop, the next move takes it from there
     public boolean updateRough(Follower follower, Pose target) {
         return update(follower, target, roughIn, roughDeg, false);
@@ -87,9 +92,10 @@ public class PointDrive {
         strafePush = push(strafePush, left, inTol, Math.abs(leftSpeed) > 1.5, dt);
         turnPush = push(turnPush, turn, tolDeg * 0.6, Math.abs(turnSpeed) > 4, dt);
 
-        boolean maxed = drivePush >= maxPush || strafePush >= maxPush || turnPush >= maxPush;
-        boolean still = Math.hypot(forwardSpeed, leftSpeed) < 1.5 && Math.abs(turnSpeed) < 4;
-        blockedTime = maxed && still ? blockedTime + dt : 0;
+        // one direction pushing its hardest and not moving while the robot is barely going anywhere = it's against something,
+        // even if it's still creeping along the wall
+        boolean jammed = (drivePush >= maxPush && Math.abs(forwardSpeed) < 1.5) || (strafePush >= maxPush && Math.abs(leftSpeed) < 1.5) || (turnPush >= maxPush && Math.abs(turnSpeed) < 4);
+        blockedTime = jammed && slow ? blockedTime + dt : 0;
         if (blocked()) {
             follower.manual(0, 0, 0);
             return false;

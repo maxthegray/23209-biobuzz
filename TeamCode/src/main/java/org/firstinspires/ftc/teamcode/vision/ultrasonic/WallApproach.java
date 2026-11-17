@@ -24,8 +24,9 @@ public class WallApproach {
 
     static final double flowerFromWall = 3.0;   // guess, measure on a real field
     static final double flowerReach = 2.4;   // top ring sticks out this far
-    static final double clearance = 2.2;   // don't touch the flower. the sensors sit about 1.1 in ahead of the frame (9 in from the pinpoint, frame is 7.875)
-    public static final double stopDistance = flowerFromWall + flowerReach + clearance;   // bumper to wall
+    static final double frontMounts = 2.0;   // the sensor and limelight mounts stick out this far past the frame
+    static final double clearance = 1.0;   // gap left between the mounts and the flower
+    public static final double stopDistance = flowerFromWall + flowerReach + frontMounts + clearance;   // frame to wall
 
     static final double settleSec = 0.4;   // after stopping, let the sensor's filter catch up
     static final double averageSec = 0.2;   // then average this long, the flicker between steps averages out
