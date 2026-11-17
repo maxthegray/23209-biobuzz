@@ -253,7 +253,7 @@ def series_seconds(records, names):
 class LogLibrary:
     def __init__(self, directory, upload_directory):
         self.directory = Path(directory).resolve()
-        self.upload_directory = Path(upload_directory)
+        self.upload_directory = Path(upload_directory).resolve()   # macOS temp folders are symlinks and register() resolves paths
         self.paths = {}
         self.names = {}
         self.cache = OrderedDict()

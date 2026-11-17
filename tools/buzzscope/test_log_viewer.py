@@ -58,6 +58,16 @@ class ViewerTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_import_is_marked_uploaded_even_through_a_symlinked_folder(self):
+        # macOS temp folders are symlinks (/var -> /private/var). the Import button's file
+        # was dropped from the list because the folder name didn't match the resolved path
+        link = self.root / "link"
+        link.symlink_to(self.uploads)
+        library = LogLibrary(self.logs, link)
+        imported = self.uploads / "x.wpilog"
+        imported.write_bytes(fixture(truncated=True))
+        self.assertTrue(library.register(imported, "Imported.wpilog")["uploaded"])
+
     def test_native_pose_and_microsecond_command_times_survive(self):
         run = self.library.overview(self.ident)
         self.assertEqual([1.000001, [8, 56, math.pi / 2]], run["playback"]["pose"][0])
