@@ -106,7 +106,7 @@ public class DriveToWallTest extends LinearOpMode {
                 if (result == WallApproach.Result.DONE) {
                     telemetry.addLine(String.format("DONE. Thinks the bumper is %.2f in away. Tape it and compare", approach.bumperToWall()));
                 } else if (result == WallApproach.Result.FAILED) {
-                    telemetry.addLine("Gave up (4 s timeout or a bad reading). Let go and hold A again");
+                    telemetry.addLine("Gave up (6 s timeout or a bad reading). Let go and hold A again");
                 } else if (driving) {
                     telemetry.addLine("Driving... let go of A to stop");
                 } else {

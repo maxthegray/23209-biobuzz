@@ -37,7 +37,7 @@ public final class UltrasonicConfig {
     // ---- 3. where to stop in front of a flower ----
     public static final double flowerFromWallIn = 3.0;   // guess, measure on a real field
     public static final double flowerReachIn = 2.4;   // top ring sticks out this far
-    public static final double clearanceIn = 1.0;   // don't touch the flower
+    public static final double clearanceIn = 2.2;   // don't touch the flower. the sensors sit about 1.1 in ahead of the frame (9 in from the pinpoint, frame is 7.875)
     public static final double stopDistanceIn = flowerFromWallIn + flowerReachIn + clearanceIn;   // bumper to wall
 
     // ---- 4. smoothing (see the comment at the top of sensors/UltrasonicSensor.java) ----
@@ -47,7 +47,7 @@ public final class UltrasonicConfig {
 
     // ---- 5. is this reading sane? (safety limits, not tunable) ----
     public static final double minReadingIn = 1.0;   // under this is a loose signal wire (it reads as 0.8), not a real wall
-    public static final double maxSkewIn = 6.0;   // sensors differ more than this = one is probably seeing the flower
+    public static final double maxSkewIn = 2.5;   // 7.5 in apart, so 2.5 in is already ~18 deg crooked. more = a sensor is seeing the flower
     public static final double tooFarIn = 30.0;   // won't drive unless both sensors see something closer than this
 
     private UltrasonicConfig() {

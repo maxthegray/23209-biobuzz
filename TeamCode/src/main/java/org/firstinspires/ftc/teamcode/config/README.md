@@ -12,6 +12,7 @@ Numbers marked `public static` (no `final`) can also be tried live in Panels
 | where the ultrasonic sensors sit, or the flower stop distance | `UltrasonicConfig.java`, sections 2 and 3 |
 | ultrasonic smoothing or the "bad reading" limits | `UltrasonicConfig.java`, sections 4 and 5 |
 | the wall approach drive gains (kpDrive, kpTurn, ...) | `../mechanisms/WallApproach.java`, top of the class |
+| path demo's drive-to-a-spot gains (kpDrive, kdDrive, ...) | `../mechanisms/PointDrive.java`, top of the class |
 | the auto-alignment turn gains | `../opmodes/tests/flowerdash/UltrasonicAutoAlignment.java`, top |
 | ball PID gains, camera exposure, the yellow colour range | `BallVisionConfig.java` |
 | Starter Drive speed, or the 30 in limit | `DriveConfig.java` |

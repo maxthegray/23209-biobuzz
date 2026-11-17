@@ -34,7 +34,7 @@ Robot code is in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`:
 |---|---|
 | `config/` | **the numbers students edit**: `HardwareNames`, `UltrasonicConfig` (calibration, geometry, limits), `BallVisionConfig`, `DriveConfig`. See `config/README.md` |
 | `sensors/` | `UltrasonicSensor` (one MaxBotix sensor, raw distance), `BulkReads` |
-| `mechanisms/` | `WallApproach` (drive up to a wall on the ultrasonics), `MecanumMotors` (drive motor setup) |
+| `mechanisms/` | `WallApproach` (drive up to a wall on the ultrasonics), `PointDrive` (drive to a spot on odometry, used by path demo), `MecanumMotors` (drive motor setup) |
 | `opmodes/teleop/` | Starter Drive teleops |
 | `opmodes/auto/pedro/` | Pedro autos (`PathDemoAllCombos`, `RedTippedExport`) |
 | `opmodes/tests/` | test opmodes (`FlowerApproachTest`, `DriveToWallTest`, `UltrasonicReadout`, ...) |
@@ -141,7 +141,7 @@ Panels changes are never saved on the robot. The code is the only place tuning i
 ## For later
 
 - **Subsystems.** `mechanisms/` holds plain shared classes now (`WallApproach`,
-  `MecanumMotors`). When a shooter or intake gets shared code, add it there the same way, with
+  `PointDrive`, `MecanumMotors`). When a shooter or intake gets shared code, add it there the same way, with
   its own log channels. A scaffolding agent for new mechanisms is worth adding at that point.
 - **Loop cost of the recorder** has not been measured on the robot. Starter Drive and the
   ball opmodes are the ones to check, because the recorder adds a hub read there.

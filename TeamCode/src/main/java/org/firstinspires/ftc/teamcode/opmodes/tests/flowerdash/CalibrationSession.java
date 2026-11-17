@@ -243,6 +243,9 @@ public class CalibrationSession {
                 return stage == Stage.DRIVE ? "Go back to results first" : null;
             case "GO_DRIVE":
                 return stage == Stage.RESULTS ? null : "GO_DRIVE ignored: not on the results screen";
+            case "SKIP_DRIVE":
+                if (stage == Stage.DRIVE) return "Already in the drive check";
+                return idle ? null : "Still recording (Cancel first)";
             case "BACK":
             case "LOG_TRIAL":
                 return stage == Stage.DRIVE ? null : cmd + " ignored: not in the drive check";

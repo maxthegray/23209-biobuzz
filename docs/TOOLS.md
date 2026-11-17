@@ -128,8 +128,8 @@ Panels is a web page served by the robot at **http://192.168.43.1:8001** while t
 app is running. Numbers marked `@Configurable` can be changed there with no redeploy.
 
 Tunable now: ultrasonic calibration (`config/UltrasonicConfig`: `leftScale`, `leftOffset`,
-`rightScale`, `rightOffset`), the wall approach and alignment gains
-(`mechanisms/WallApproach`, `UltrasonicAutoAlignment`), the ball PID gains
+`rightScale`, `rightOffset`), the wall approach, drive-to-a-spot and alignment gains
+(`mechanisms/WallApproach`, `mechanisms/PointDrive`, `UltrasonicAutoAlignment`), the ball PID gains
 (`config/BallVisionConfig`) and the teleop speed (`config/DriveConfig`). Safety limits (power caps,
 timeouts) are deliberately not tunable.
 

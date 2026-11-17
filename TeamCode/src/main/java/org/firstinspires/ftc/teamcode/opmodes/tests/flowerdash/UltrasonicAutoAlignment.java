@@ -29,7 +29,7 @@ public class UltrasonicAutoAlignment extends LinearOpMode {
 
     // the public static ones can be changed live in Panels (http://192.168.43.1:8001), see tuning/Tunables.java.
     // the final ones are limits and stay put. turn power is always clipped to maxTurn, whatever the others are
-    public static double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 3.6 deg with 16 in spacing
+    public static double kp = 0.05;   // turn power per inch of difference. 1 in difference is about 7.6 deg with the 7.5 in spacing
     static final double maxTurn = 0.35;
     public static double minTurn = 0.08;   // starting minimum, the push below adds to it until the robot actually turns
     public static double pushRate = 0.4;   // power per second added while the robot is stuck (not turning)

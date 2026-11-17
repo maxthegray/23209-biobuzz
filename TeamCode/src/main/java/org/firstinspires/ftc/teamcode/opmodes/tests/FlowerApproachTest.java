@@ -45,7 +45,7 @@ public class FlowerApproachTest extends LinearOpMode {
     private WallApproach approach;
     private CalibrationSession session;
 
-    private boolean lastA, lastB, lastX, lastHeld;
+    private boolean lastA, lastB, lastX, lastY, lastHeld;
     private boolean driving = false;
     private boolean usingFix = false;
     private double lastBeat = -1e9;
@@ -111,12 +111,15 @@ public class FlowerApproachTest extends LinearOpMode {
 
     // the gamepad makes the same commands the website does
     private void gamepadCommands() {
-        boolean a = gamepad1.a && !lastA, b = gamepad1.b && !lastB, x = gamepad1.x && !lastX;
+        boolean a = gamepad1.a && !lastA, b = gamepad1.b && !lastB, x = gamepad1.x && !lastX, y = gamepad1.y && !lastY;
         lastA = gamepad1.a;
         lastB = gamepad1.b;
         lastX = gamepad1.x;
+        lastY = gamepad1.y;
         Stage stage = session.stage();
-        if (stage == Stage.CALIBRATE) {
+        if (y && stage != Stage.DRIVE) {
+            commands.add(new Command("SKIP_DRIVE"));   // no measuring, straight to driving with the tuned numbers
+        } else if (stage == Stage.CALIBRATE) {
             if (a) commands.add(new Command("RECORD"));
             else if (b) commands.add(new Command("REDO"));
             else if (x) commands.add(new Command("DONE"));
@@ -171,6 +174,15 @@ public class FlowerApproachTest extends LinearOpMode {
                 result = null;
                 driveNote = "";
                 session.enterDrive(usingFix, k);
+                break;
+            }
+            case "SKIP_DRIVE": {
+                usingFix = false;
+                double[] k = WallApproach.pastedFix();
+                approach.useCalibration();   // the numbers in config/UltrasonicConfig, live, so a Panels change shows up
+                result = null;
+                driveNote = "";
+                session.enterDrive(false, k);
                 break;
             }
             case "BACK":
@@ -239,6 +251,7 @@ public class FlowerApproachTest extends LinearOpMode {
         telemetry.addLine(String.format("Signal  left %.3f V   right %.3f V", v[0], v[2]));
         telemetry.addLine("");
         telemetry.addLine("A = record   B = redo last step   X = done, show results");
+        telemetry.addLine("Y = skip measuring, go straight to the drive check");
     }
 
     private void results() {
@@ -248,7 +261,7 @@ public class FlowerApproachTest extends LinearOpMode {
         telemetry.addLine("See the website for the table and graphs");
         if (leftFit.points < 3) {
             telemetry.addLine("Need at least 3 distances to judge the formula");
-            telemetry.addLine("A = drive check with no fix   B = redo formula check");
+            telemetry.addLine("A or Y = drive check with the tuned numbers   B = redo formula check");
             return;
         }
         double[] k = WallApproach.pastedFix();
@@ -300,7 +313,7 @@ public class FlowerApproachTest extends LinearOpMode {
     }
 
     private void drive(boolean canDrive) {
-        telemetry.addLine("DRIVE CHECK" + (usingFix ? " (using this run's fix)" : " (using the fix pasted in the code)"));
+        telemetry.addLine("DRIVE CHECK" + (usingFix ? " (using this run's fix)" : " (using the numbers in config/UltrasonicConfig)"));
         if (!canDrive) {
             telemetry.addLine("Press START on the Driver Hub to drive");
             telemetry.addLine("B = back to results");
@@ -319,7 +332,7 @@ public class FlowerApproachTest extends LinearOpMode {
             telemetry.addLine(String.format("DONE. Thinks the bumper is %.2f in away. Tape it and compare", approach.bumperToWall()));
             telemetry.addLine("Hold again for another try");
         } else if (result == WallApproach.Result.FAILED) {
-            telemetry.addLine("Gave up (4 s timeout or a bad reading). Hold again to try again");
+            telemetry.addLine("Gave up (6 s timeout or a bad reading). Hold again to try again");
         } else if (driving) {
             telemetry.addLine("Driving... let go to stop");
         }

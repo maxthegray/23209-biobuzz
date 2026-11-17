@@ -46,7 +46,7 @@ edit code  →  make build  →  make deploy  →  run an opmode  →  make pull
 |---|---|
 | `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/` | the robot code |
 | `…/teamcode/config/` | **the numbers you edit**: hardware names, ultrasonic calibration, ball vision, drive speed |
-| `…/teamcode/sensors/`, `…/teamcode/mechanisms/` | shared code the opmodes use (ultrasonic sensor, wall approach, drive motors) |
+| `…/teamcode/sensors/`, `…/teamcode/mechanisms/` | shared code the opmodes use (ultrasonic sensor, wall approach, drive to a spot, drive motors) |
 | `…/teamcode/opmodes/` | the opmodes: `teleop/`, `auto/`, `tests/`, `vision/` |
 | `…/teamcode/logging/` | the flight recorder that writes the run logs |
 | `…/teamcode/tuning/` | `Tunables`, which tells you what to copy back after tuning in Panels |
