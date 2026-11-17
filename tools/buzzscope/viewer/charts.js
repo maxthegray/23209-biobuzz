@@ -7,7 +7,7 @@ export function createCharts({seek, saveLayout, onWindow}) {
     $('charts').replaceChildren();
     state.charts = [];
     state.focusedChart = null;
-    (state.layout?.layers || [[]]).forEach((keys, i) => createChart(keys, state.layout?.discrete?.[i] ?? [])));
+    (state.layout?.layers || [[]]).forEach((keys, i) => createChart(keys, state.layout?.discrete?.[i] ?? []));
     updateChartControls();
   }
 

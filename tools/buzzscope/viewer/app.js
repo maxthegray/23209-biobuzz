@@ -110,7 +110,7 @@ async function openRun(id) {
   $('welcome').hidden = true;
   notice('Opening flight log… Large runs can take a few seconds.');
   try {
-    const run = await api(`/api/log?id=${encodeURIComponent(id)}`);
+    const run = await api(`/api/run?id=${encodeURIComponent(id)}`);
     if (generation !== state.generation) return;
     state.run = run;
     state.time = 0;

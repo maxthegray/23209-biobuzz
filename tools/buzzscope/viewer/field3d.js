@@ -218,7 +218,7 @@ async function load(id, time = null) {
   const generation = ++page.generation;
   $('field3d-note').hidden = false; $('field3d-note').textContent = 'Opening run…';
   try {
-    const response = await fetch(`/api/log?id=${encodeURIComponent(id)}`);
+    const response = await fetch(`/api/run?id=${encodeURIComponent(id)}`);
     const run = await response.json();
     if (!response.ok) throw new Error(run.error || 'Could not read this log');
     if (generation !== page.generation) return;

@@ -20,7 +20,7 @@ export function createOverlays({onChange, downsample}) {
     state.overlays.push(overlay);
     render();
     try {
-      overlay.run = await api(`/api/log?id=${encodeURIComponent(id)}`);
+      overlay.run = await api(`/api/run?id=${encodeURIComponent(id)}`);
       if (!state.overlays.includes(overlay)) return;
       overlay.raw = new Map(Object.entries(overlay.run.playback));
       align(overlay);

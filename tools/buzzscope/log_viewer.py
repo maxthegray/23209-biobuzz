@@ -422,7 +422,7 @@ def handler_for(library):
             try:
                 if url.path == "/api/logs":
                     self.send_json(library.catalog())
-                elif url.path == "/api/log":
+                elif url.path == "/api/run":
                     self.send_json(library.overview(query.get("id", [""])[0]))
                 elif url.path == "/api/problems":
                     self.send_json(library.problems(query.get("id", [""])[0]))

@@ -126,7 +126,7 @@ class ViewerTest(unittest.TestCase):
         thread.start()
         connection = http.client.HTTPConnection("127.0.0.1", server.server_port)
         try:
-            connection.request("GET", f"/api/log?id={self.ident}", headers={"Accept-Encoding": "gzip"})
+            connection.request("GET", f"/api/run?id={self.ident}", headers={"Accept-Encoding": "gzip"})
             response = connection.getresponse()
             data = response.read()
             if response.getheader("Content-Encoding") == "gzip":
