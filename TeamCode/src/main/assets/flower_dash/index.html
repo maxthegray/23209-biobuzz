@@ -99,7 +99,7 @@ canvas{width:100%;height:280px;display:block}
       <button class="primary" id="skipDrive">Skip measuring, go to drive check</button>
       <button id="restart">Start over</button>
     </div>
-    <table id="stepTable"><thead><tr><th>tape</th><th>left</th><th>right</th><th>wobble L/R</th></tr></thead><tbody></tbody></table>
+    <table id="stepTable"><thead><tr><th>tape</th><th>left</th><th>right</th><th>wobble L/R</th><th>noise L/R</th></tr></thead><tbody></tbody></table>
     <label for="tapes">Distances to test (in), comma separated</label>
     <div class="row"><input class="wide" style="flex:1" id="tapes" type="text"><button id="setTapes">Apply</button></div>
     <div id="wobbleWarn" class="verdict warn"></div>
@@ -170,7 +170,7 @@ let S=null;                 // latest state from the robot
 let samples=[];             // [idx,t,step,attempt,phase,counted,corrected,tape,l,r,v]
 let sessionId=null, nextIndex=0, connected=false, lastOk=0, windowSec=30, paused=false, geoInit=false, tapesInit="";
 let hover={};
-// the fix pasted in WallApproach, as [leftScale, leftOffset, rightScale, rightOffset]
+// the fix in config/UltrasonicConfig.java, as [leftScale, leftOffset, rightScale, rightOffset]
 function codeFix(){return S&&S.config&&S.config.pasted?S.config.pasted:[1,0,1,0]}
 function withFix(k,side,v){return v==null?null:side==="left"?k[0]*v+k[1]:k[2]*v+k[3]}
 function noFixYet(k){return k[0]===1&&k[1]===0&&k[2]===1&&k[3]===0}
@@ -275,9 +275,11 @@ function render(){
     tr.insertCell().textContent=s.recorded?f2(withFix(k,"left",s.left)):"-";
     tr.insertCell().textContent=s.recorded?f2(withFix(k,"right",s.right)):"-";
     tr.insertCell().textContent=s.recorded?f2(s.leftWobble*Math.abs(k[0]))+" / "+f2(s.rightWobble*Math.abs(k[2])):"-";
+    const nc=tr.insertCell();nc.textContent=s.recorded?f2(s.leftNoise*Math.abs(k[0]))+" / "+f2(s.rightNoise*Math.abs(k[2])):"-";
+    if(s.recorded&&Math.max(s.leftNoise,s.rightNoise)>c.noisy)nc.className="warn";
   });
   const fs=fixedSteps();
-  $("wobbleWarn").textContent=S.fit.maxWobble>c.jumpy?"Readings wobble a lot (over "+c.jumpy+" in). Unplug one sensor: if the other calms down they're hearing each other. If not, put a 100uF capacitor across the sensor's V+ and GND.":"";
+  $("wobbleWarn").textContent=S.fit.maxNoise>c.noisy?"Readings are noisy (std dev over "+c.noisy+" in). Download the raw CSV and check whether left_sig_v changes faster than every 0.1 s (electrical) or jumps every few readings (the sensors hearing each other). Unplug one sensor: if the other calms down they're hearing each other. If not, put a 100uF capacitor across the sensor's V+ and GND.":"";
 
   // step 2
   const L=S.fit.left,R=S.fit.right;
@@ -287,7 +289,7 @@ function render(){
   $("verdicts").innerHTML=say("Left",wl)+say("Right",wr);
   const kc=codeFix(),differs=Math.abs(L.scale-kc[0])>0.005||Math.abs(L.offset-kc[1])>0.02||Math.abs(R.scale-kc[2])>0.005||Math.abs(R.offset-kc[3])>0.02;
   const need=fs.length>=3&&L.points>=3&&Math.max(wl,wr)>c.goodEnough&&differs;   // no point telling you to paste what's already there
-  $("paste").innerHTML=need?`<p>Update the fix in <code>vision/ultrasonic/WallApproach.java</code> to:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
+  $("paste").innerHTML=need?`<p>Update the fix in <code>config/UltrasonicConfig.java</code> to:</p><pre id="pasteTxt">leftScale = ${L.scale.toFixed(4)}, leftOffset = ${L.offset.toFixed(3)}\nrightScale = ${R.scale.toFixed(4)}, rightOffset = ${R.offset.toFixed(3)}</pre><button id="copy">Copy</button>`:"";
   if($("copy"))$("copy").onclick=()=>navigator.clipboard&&navigator.clipboard.writeText($("pasteTxt").textContent);
   $("goFix").disabled=!(stg==="RESULTS"&&L.sane&&R.sane);$("goNoFix").disabled=stg!=="RESULTS";$("restart2").disabled=stg!=="RESULTS";
 
@@ -337,14 +339,14 @@ hb.addEventListener("contextmenu",e=>e.preventDefault());
 // ---------- CSV (built here from our copy of the data) ----------
 const fx=(x,d=4)=>x==null?"":Number(x).toFixed(d);
 function rawCsv(){
-  let o="t_s,attempt,step,phase,counted,corrected,tape_in,left_in,right_in,supply_v\n";
-  for(const s of samples)o+=[fx(s[1]),s[3],s[2]+1,PHASES[s[4]],s[5],s[6],fx(s[7]),fx(s[8]),fx(s[9]),fx(s[10])].join(",")+"\n";
+  let o="t_s,attempt,step,phase,counted,corrected,tape_in,left_in,right_in,supply_v,left_sig_v,left_vcc_v,right_sig_v,right_vcc_v\n";
+  for(const s of samples)o+=[fx(s[1]),s[3],s[2]+1,PHASES[s[4]],s[5],s[6],fx(s[7]),fx(s[8]),fx(s[9]),fx(s[10]),fx(s[11]),fx(s[12]),fx(s[13]),fx(s[14])].join(",")+"\n";
   return o}
 function summaryCsv(){
-  let o="step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples,left_with_code_fix_in,right_with_code_fix_in,left_fixed_error_in,right_fixed_error_in\n";
+  let o="step,tape_in,left_mean_in,right_mean_in,left_wobble_in,right_wobble_in,left_error_in,right_error_in,n_samples,left_with_code_fix_in,right_with_code_fix_in,left_fixed_error_in,right_fixed_error_in,left_noise_in,right_noise_in\n";
   const k=codeFix();
   if(S)S.steps.forEach((s,i)=>{if(s.recorded){const fl=withFix(k,"left",s.left),fr=withFix(k,"right",s.right);
-    o+=[i+1,fx(s.tape),fx(s.left),fx(s.right),fx(s.leftWobble),fx(s.rightWobble),fx(s.left-s.tape),fx(s.right-s.tape),s.n,fx(fl),fx(fr),fx(fl-s.tape),fx(fr-s.tape)].join(",")+"\n"}});
+    o+=[i+1,fx(s.tape),fx(s.left),fx(s.right),fx(s.leftWobble),fx(s.rightWobble),fx(s.left-s.tape),fx(s.right-s.tape),s.n,fx(fl),fx(fr),fx(fl-s.tape),fx(fr-s.tape),fx(s.leftNoise),fx(s.rightNoise)].join(",")+"\n"}});
   return o}
 function fitCsv(){
   let o="sensor,scale,offset,r2,rmse_in,max_error_before_in,max_error_after_in,points,sensor_spacing_in,sensor_setback_in\n";

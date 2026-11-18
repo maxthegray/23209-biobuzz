@@ -11,15 +11,34 @@
 
 // Custom definitions may go here
 
+// sloth's Load plugin: adds the deploySloth (hot reload) gradle task. keep it at the same version as the Sloth
+// library below
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url = 'https://repo.dairy.foundation/releases' }
+    }
+    dependencies {
+        classpath 'dev.frozenmilk:Load:0.2.4'
+    }
+}
+
 // Include common definitions from above.
 apply from: '../build.common.gradle'
 apply from: '../build.dependencies.gradle'
+apply plugin: 'dev.frozenmilk.sinister.sloth.load'
 
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
 
     packagingOptions {
         jniLibs.useLegacyPackaging true
+    }
+
+    testOptions {
+        unitTests {
+            returnDefaultValues = true
+        }
     }
 
     // Disable pedro stuff (temporarily)
@@ -37,4 +56,14 @@ android {
 
 dependencies {
     implementation project(':FtcRobotController')
+
+    implementation 'com.bylazar.sloth:fullpanels:0.2.4+1.0.12'
+    implementation 'dev.frozenmilk.sinister:Sloth:0.2.4'
+    constraints {
+        implementation('dev.frozenmilk.sinister:Sloth') {
+            version { strictly '0.2.4' }
+        }
+    }
+
+    testImplementation 'junit:junit:4.13.2'
 }
