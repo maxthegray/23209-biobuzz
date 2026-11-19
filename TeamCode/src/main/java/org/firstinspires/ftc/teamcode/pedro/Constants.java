@@ -31,8 +31,8 @@ public class Constants {
     public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
         c.name.set("pinpoint");
         c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
-        c.xPodOffset.set(-2.81496062992);
-        c.yPodOffset.set(3.15);   // was 0.0. the pinpoint tuner measured 3.15 on 9/30, and 0 put the robot ~4 in off after every turn. rerun the tuner to confirm
+        c.xPodOffset.set(3.0618);
+        c.yPodOffset.set(0.49);   // was 0.0. the pinpoint tuner measured 3.15 on 9/30, and 0 put the robot ~4 in off after every turn. rerun the tuner to confirm
         c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
         c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
         c.globalDistanceUnit.set(DistanceUnit.INCH);
