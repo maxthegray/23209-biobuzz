@@ -58,6 +58,7 @@
   --robot-line: #111416;
   --robot-arrow:#2f6fe4;
   --ball: #e07020;
+  --sonar: #1f8fbf;
   --overlay-0: #7a3fd6;
   --alliance-red: #d63a3a;
   --alliance-blue: #2f5fd6;
@@ -152,6 +153,7 @@
   --robot-line: #0e1011;
   --robot-arrow:#4d8dff;
   --ball: #ff8f3a;
+  --sonar: #4cc3f0;
   --overlay-0: #c08cff;
   --alliance-red: #ff5a5a;
   --alliance-blue: #4f86ff;
@@ -640,6 +642,15 @@ canvas {
 }
 
 .ball-status {
+  left: auto;
+  right: 24px;
+  color: var(--ink);
+  background: var(--pill-bg);
+  font-family: ui-monospace,monospace;
+}
+
+.sonar-status {
+  top: 36px;   /* under the Ball chip, clear of the axis labels */
   left: auto;
   right: 24px;
   color: var(--ink);
@@ -2261,4 +2272,92 @@ canvas {
 
 .tuned-note {
   opacity: 0.7;
+}
+
+/* Sonar view: one bar per ultrasonic, 0 in at the bottom */
+.sonar {
+  padding: 8px 20px 18px;
+}
+
+.sonar-bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.sonar-side {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.sonar-name {
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.sonar-value {
+  font-family: ui-monospace,monospace;
+  font-size: 18px;
+}
+
+.sonar-track {
+  position: relative;
+  width: 36px;
+  height: 160px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--pill-bg);
+  overflow: hidden;
+}
+
+.sonar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--sonar);
+}
+
+.sonar-target {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  height: 2px;
+  background: var(--ink);
+}
+
+.sonar-side.far .sonar-fill {
+  opacity: .45;
+}
+
+.sonar-side.bad .sonar-value {
+  color: var(--red);
+}
+
+.sonar-volts {
+  font-family: ui-monospace,monospace;
+  font-size: 9px;
+  color: var(--muted);
+  min-height: 1em;
+  text-align: center;
+}
+
+.sonar-summary {
+  margin-top: 12px;
+  text-align: center;
+  font-family: ui-monospace,monospace;
+  font-size: 11px;
+}
+
+.sonar-note {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sonar-note:empty {
+  display: none;
 }

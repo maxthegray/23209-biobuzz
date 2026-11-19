@@ -38,14 +38,14 @@ export function createLayout({seek, preparePlots, redraw}) {
     if (state.run) seek(state.time);
   }
 
-  const viewNames = {field: 'Field', signals: 'Signals', commands: 'Commands', events: 'Events', gamepads: 'Gamepads', problems: 'Problems', camera: 'Camera'};
+  const viewNames = {field: 'Field', signals: 'Signals', commands: 'Commands', events: 'Events', gamepads: 'Gamepads', problems: 'Problems', camera: 'Camera', sonar: 'Sonar'};
   const views = new Map();
   const layoutKey = 'buzzscope.layout.v2';
 
   function saveLayout() {
     state.layout = {panels: state.panels, layers: state.charts.length ? state.charts.map(chart => [...chart.keys]) : state.layout?.layers,
       discrete: state.charts.length ? state.charts.map(chart => [...chart.discreteKeys]) : state.layout?.discrete,
-      fieldCommands: $('field-commands-toggle').checked, fieldBall: $('field-ball-toggle').checked, fieldElements: $('field-elements-toggle').checked,
+      fieldCommands: $('field-commands-toggle').checked, fieldBall: $('field-ball-toggle').checked, fieldSonar: $('field-sonar-toggle').checked, fieldElements: $('field-elements-toggle').checked,
       cameraViews: Object.fromEntries(state.cameraViews.map(view => [view.key, view.source]))};
     try { localStorage.setItem(layoutKey, JSON.stringify(state.layout)); } catch { /* Storage may be disabled. */ }
   }
@@ -228,7 +228,7 @@ export function createLayout({seek, preparePlots, redraw}) {
   function initializeLayout() {
     const elements = {field: document.querySelector('.field-card'), signals: document.querySelector('.signals-card'),
       commands: $('commands').closest('.card'), events: $('events').closest('.card'), gamepads: document.querySelector('.inputs-card'),
-      problems: document.querySelector('.problems-card')};
+      problems: document.querySelector('.problems-card'), sonar: document.querySelector('.sonar-card')};
     for (const [key, view] of Object.entries(elements)) {
       view.dataset.panel = key; views.set(key, view);
       addDragHandle(key, view);
@@ -239,6 +239,7 @@ export function createLayout({seek, preparePlots, redraw}) {
       const saved = JSON.parse(localStorage.getItem(layoutKey));
       $('field-commands-toggle').checked = saved?.fieldCommands !== false;
       $('field-ball-toggle').checked = saved?.fieldBall !== false;
+      $('field-sonar-toggle').checked = saved?.fieldSonar !== false;
       $('field-elements-toggle').checked = saved?.fieldElements !== false;
       const previous = saved || JSON.parse(localStorage.getItem('buzzscope.layout.v1'));
       if (saved?.panels) {

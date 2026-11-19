@@ -32,7 +32,7 @@ Robot code is in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`:
 
 | Folder | What's in it |
 |---|---|
-| `config/` | **the numbers students edit**: `HardwareNames`, `UltrasonicConfig` (calibration, geometry, limits), `BallVisionConfig`, `DriveConfig`. See `config/README.md` |
+| `config/` | **the numbers students edit**: `HardwareNames`, `UltrasonicConfig` (calibration, geometry, limits), `BallVisionConfig`, `DriveConfig`, `LiveView` (on/off switches for live sensor views). See `config/README.md` |
 | `sensors/` | `UltrasonicSensor` (one MaxBotix sensor, raw distance), `BulkReads` |
 | `mechanisms/` | `WallApproach` (drive up to a wall on the ultrasonics), `PointDrive` (drive to a spot on odometry, used by path demo), `MecanumMotors` (drive motor setup) |
 | `opmodes/teleop/` | Starter Drive teleops |
@@ -41,7 +41,7 @@ Robot code is in `TeamCode/src/main/java/org/firstinspires/ftc/teamcode/`:
 | `opmodes/tests/flowerdash/` | the flower dash: a small web page served by the robot on port 8765+ |
 | `opmodes/vision/` | ball finding with the webcam |
 | `pedro/` | `Constants.java` (drive + Pinpoint + follower tuning), Pedro's own tuners |
-| `logging/` | flight recorder |
+| `logging/` | flight recorder (also logs the two ultrasonics in every opmode) |
 | `tuning/` | `Tunables`: tells you what to copy back after live tuning |
 
 Outside the robot code: `tools/` (deploy scripts, log tools, BuzzScope), `docs/LOGGING.md`,

@@ -142,6 +142,66 @@ export function ballEstimate(pose, sighting, mount, ballDiameterIn = POLLEN_DIAM
   return {origin, bearing, distanceIn, point: [origin[0] + Math.cos(bearing) * distanceIn, origin[1] + Math.sin(bearing) * distanceIn]};
 }
 
+// The two front ultrasonics. Channels are the ones the flight recorder and WallApproach both write.
+export const SONAR_DEFAULT_MOUNT = {spacingIn: 7.5, setbackIn: 0};   // UltrasonicConfig, for logs without Ultrasonic/mount
+export const SONAR_TOO_FAR_IN = 30;   // UltrasonicConfig.tooFarIn: past this WallApproach won't trust it
+export const SONAR_MIN_IN = 1;   // UltrasonicConfig.minReadingIn: under this is a loose signal wire
+export const SONAR_MAX_IN = 5000 / 25.4;   // the farthest the sensor reports
+
+export function hasSonar(playback) {
+  return Boolean(playback?.['Ultrasonic/leftIn']?.length || playback?.['Ultrasonic/rightIn']?.length);
+}
+
+// What both sensors read at `time`, or null when neither has a sample in the last maxAgeSec. A side
+// with no fresh sample is null; NaN (supply under 1 V) comes back as NaN so it can be drawn as bad.
+export function sonarReading(playback, time, maxAgeSec = 0.3) {
+  const fresh = name => {
+    const series = playback?.[name] || [], index = indexAt(series, time);
+    if (index < 0 || time - series[index][0] > maxAgeSec) return null;
+    const value = series[index][1];
+    return typeof value === 'number' ? value : (value === null ? NaN : null);
+  };
+  const leftIn = fresh('Ultrasonic/leftIn'), rightIn = fresh('Ultrasonic/rightIn');
+  if (leftIn === null && rightIn === null) return null;
+  const mount = {
+    spacingIn: sampleAt(playback['Ultrasonic/mount/spacingIn'], time) ?? SONAR_DEFAULT_MOUNT.spacingIn,
+    setbackIn: sampleAt(playback['Ultrasonic/mount/setbackIn'], time) ?? SONAR_DEFAULT_MOUNT.setbackIn,
+    logged: Boolean(playback['Ultrasonic/mount/spacingIn']?.length),
+  };
+  const both = finite(leftIn) && finite(rightIn);
+  return {
+    leftIn, rightIn, mount,
+    leftRawIn: fresh('Ultrasonic/leftRawIn'), rightRawIn: fresh('Ultrasonic/rightRawIn'),
+    leftSignalVolts: fresh('Ultrasonic/leftSignalVolts'), rightSignalVolts: fresh('Ultrasonic/rightSignalVolts'),
+    leftVccVolts: fresh('Ultrasonic/leftVccVolts'), rightVccVolts: fresh('Ultrasonic/rightVccVolts'),
+    // + means the left side is farther: the robot is turned to the right of square to the wall
+    skewIn: both ? leftIn - rightIn : null,
+    angleDeg: both ? Math.atan2(leftIn - rightIn, mount.spacingIn) * 180 / Math.PI : null,
+  };
+}
+
+function sonarState(value) {
+  if (value === null) return 'none';
+  if (!finite(value) || value < SONAR_MIN_IN) return 'bad';
+  return value > SONAR_TOO_FAR_IN ? 'far' : 'ok';
+}
+
+// Each beam in field inches: from the sensor face (front of the robot, half the spacing to each side,
+// minus the setback) straight ahead by the reading. `bad` beams have no length; `far` ones are drawn
+// to the reading, but the robot wouldn't trust them.
+export function sonarBeams(pose, reading, frontIn = ROBOT_HALF_IN) {
+  if (!reading || !pose || !finite(pose[0]) || !finite(pose[1])) return [];
+  const heading = finite(pose[2]) ? pose[2] : 0, cos = Math.cos(heading), sin = Math.sin(heading);
+  const forwardIn = frontIn - (reading.mount?.setbackIn ?? 0), half = (reading.mount?.spacingIn ?? SONAR_DEFAULT_MOUNT.spacingIn) / 2;
+  return [['left', reading.leftIn, half], ['right', reading.rightIn, -half]].flatMap(([side, value, leftIn]) => {
+    const state = sonarState(value);
+    if (state === 'none') return [];
+    const start = [pose[0] + cos * forwardIn - sin * leftIn, pose[1] + sin * forwardIn + cos * leftIn];
+    const length = state === 'bad' ? 0 : Math.min(value, SONAR_MAX_IN);
+    return [{side, state, valueIn: value, start, end: [start[0] + cos * length, start[1] + sin * length]}];
+  });
+}
+
 export function scalarSeries(series, component = null, scale = 1) {
   return series.map(([t, value]) => {
     const scalar = component === null ? value

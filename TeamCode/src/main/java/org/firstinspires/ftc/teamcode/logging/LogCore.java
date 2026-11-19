@@ -152,6 +152,18 @@ final class LogCore {
         c.count = value.length;
     }
 
+    // true when something already put this channel since the last commit/discard
+    synchronized boolean pending(String name) {
+        Channel c = channels.get(name);
+        return c != null && c.pending;
+    }
+
+    // the number put in this channel since the last commit/discard, NaN if there isn't one
+    synchronized double pendingDouble(String name) {
+        Channel c = channels.get(name);
+        return c != null && c.pending && c.kind == DOUBLE ? c.d : Double.NaN;
+    }
+
     // true when this loop should be a sample. doesn't change anything, commit() does
     synchronized boolean sampleDue() {
         return !closed && !failed && clock.nanos() >= nextSampleNs;

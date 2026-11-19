@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {activeCommandSpans, fieldPoint, fieldView, ballSighting, ballEstimate, cameraDetections, loggedCameraMount, cameraSources, sampleAt, plotPoints, plotBounds, plotMargins, extremes, scalarSeries, channelOptions, channelTree, discreteOptions, discreteSeries, discreteIntervals, alignmentAnchor, shiftSeries, adjacentProblem, problemsAt, matchPhases, phaseAt, posePasses, nextPass, followWindow} from './core.mjs';
+import {activeCommandSpans, fieldPoint, fieldView, ballSighting, ballEstimate, cameraDetections, loggedCameraMount, cameraSources, sampleAt, plotPoints, plotBounds, plotMargins, extremes, scalarSeries, channelOptions, channelTree, discreteOptions, discreteSeries, discreteIntervals, alignmentAnchor, shiftSeries, adjacentProblem, problemsAt, matchPhases, phaseAt, posePasses, nextPass, followWindow, sonarReading, sonarBeams, hasSonar} from './core.mjs';
 
 test('Pedro field corners retain their axes with only screen Y inverted', () => {
   const view = {minX: 0, minY: 0, span: 141.5};
@@ -370,4 +370,50 @@ test('a following graph window keeps its length and the cursor two thirds across
   assert.deepEqual(followWindow(5, 9, 6), [0, 6]);
   assert.deepEqual(followWindow(150, Infinity, 300), [0, 300]);
   assert.deepEqual(followWindow(0, 10, 0), [0, 0.001]);
+});
+
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+
+test('sonar reading takes fresh samples, the logged mount, and works out the skew', () => {
+  const playback = {'Ultrasonic/leftIn': [[0, 10], [1, 12]], 'Ultrasonic/rightIn': [[0, 10], [1, 11]],
+    'Ultrasonic/mount/spacingIn': [[0, 8]], 'Ultrasonic/mount/setbackIn': [[0, 1]]};
+  assert.ok(hasSonar(playback));
+  assert.ok(!hasSonar({pose: [[0, [0, 0, 0]]]}));
+  const r = sonarReading(playback, 1.1);
+  assert.equal(r.leftIn, 12);
+  assert.equal(r.rightIn, 11);
+  assert.equal(r.skewIn, 1);
+  assert.ok(near(r.angleDeg, Math.atan2(1, 8) * 180 / Math.PI));
+  assert.deepEqual([r.mount.spacingIn, r.mount.setbackIn, r.mount.logged], [8, 1, true]);
+  assert.equal(sonarReading(playback, 1.5), null);
+  assert.equal(sonarReading(playback, -1), null);
+});
+
+test('sonar reading falls back to the code mount and keeps NaN as bad', () => {
+  const r = sonarReading({'Ultrasonic/leftIn': [[0, null]], 'Ultrasonic/rightIn': [[0, 20]]}, 0.1);
+  assert.ok(Number.isNaN(r.leftIn));
+  assert.equal(r.skewIn, null);
+  assert.deepEqual([r.mount.spacingIn, r.mount.setbackIn, r.mount.logged], [7.5, 0, false]);
+});
+
+test('sonar beams start at the robot front and point along the heading', () => {
+  const reading = {leftIn: 10, rightIn: 40, mount: {spacingIn: 8, setbackIn: 1}};
+  const [left, right] = sonarBeams([50, 50, 0], reading);
+  assert.deepEqual(left.start, [57, 54]);
+  assert.deepEqual(left.end, [67, 54]);
+  assert.equal(left.state, 'ok');
+  assert.deepEqual(right.start, [57, 46]);
+  assert.equal(right.state, 'far');
+  const [up] = sonarBeams([50, 50, Math.PI / 2], reading);
+  assert.ok(near(up.start[0], 46) && near(up.start[1], 57) && near(up.end[1], 67));
+});
+
+test('bad and missing sonar readings', () => {
+  const beams = sonarBeams([0, 0, 0], {leftIn: NaN, rightIn: null, mount: {spacingIn: 8, setbackIn: 0}});
+  assert.equal(beams.length, 1);
+  assert.equal(beams[0].state, 'bad');
+  assert.deepEqual(beams[0].start, beams[0].end);
+  assert.equal(sonarBeams([0, 0, 0], {leftIn: 0.5, rightIn: 5, mount: {}})[0].state, 'bad');
+  assert.deepEqual(sonarBeams(null, {leftIn: 5}), []);
+  assert.deepEqual(sonarBeams([NaN, 0, 0], {leftIn: 5}), []);
 });

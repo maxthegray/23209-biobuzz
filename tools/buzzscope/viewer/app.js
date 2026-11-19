@@ -1,9 +1,10 @@
-import {finite, indexAt, sampleAt, activeCommandSpans, fieldView, ballSources, cameraSources, channelOptions, channelTree, discreteOptions, buttonNames, alignmentAnchor, shiftSeries, adjacentProblem, problemsAt, matchPhases, phaseAt, minutes, posePasses, nextPass} from './core.mjs';
+import {finite, indexAt, sampleAt, activeCommandSpans, fieldView, ballSources, hasSonar, cameraSources, channelOptions, channelTree, discreteOptions, buttonNames, alignmentAnchor, shiftSeries, adjacentProblem, problemsAt, matchPhases, phaseAt, minutes, posePasses, nextPass} from './core.mjs';
 import {$, state, fmt, fmtTime, node, api, notice, commandCoverage, refreshColors, runLabel, runDay, runClock, runDate} from './ui.js';
 import {createOverlays, shownOverlays, MAX_OVERLAYS} from './overlays.js';
 import {createCharts} from './charts.js';
 import {createLayout} from './layout.js';
 import {drawField, drawCamera, fillCameraSources, fieldInches} from './field-camera.js';
+import {renderSonar, updateSonar} from './sonar.js';
 
 // Whole words, so "schedule default Drive" isn't a FAULT. Matches the server's problem rule.
 const faultPattern = /\b(?:FAULT|CRASH|FAIL(?:ED|URE)?|LOST|INCOMPLETE|DISABLED|OVERRUN)\b/i;
@@ -134,6 +135,7 @@ async function openRun(id) {
     updateFieldView();
     state.cameras = cameraSources(run.channels);
     $('field-ball-option').hidden = !ballSources(state.cameras).some(source => run.playback[source.tx]?.length);
+    $('field-sonar-option').hidden = !hasSonar(run.playback);
     for (const view of state.cameraViews) fillCameraSources(view);
     $('run-title').textContent = runLabel(run.name);
     $('run-file').textContent = run.name;
@@ -155,6 +157,7 @@ async function openRun(id) {
     renderCommands();
     renderEvents();
     renderGamepads();
+    renderSonar();
     renderCharts();
     renderLibrary();
     // Op-mode start, or the first pose after it: the start event lands a loop before any sample.
@@ -433,6 +436,7 @@ function updateDetails() {
   const flagged = new Set(problemsAt(state.problems, state.time));
   for (const [item, element] of state.problemNodes || []) element.classList.toggle('current', flagged.has(item));
   overlays.renderPoses();
+  updateSonar();
   for (const pad of state.pads) {
     const axes = sampleAt(playback[`gamepad${pad.number}/axes`], state.time);
     const mask = sampleAt(playback[`gamepad${pad.number}/buttons`], state.time);
@@ -485,6 +489,7 @@ $('scrub').oninput = () => { stop(); seek(Number($('scrub').value)); };
 $('event-filter').onchange = () => { renderEvents(); updateDetails(); };
 $('field-commands-toggle').onchange = () => { saveLayout(); if (state.run) updateDetails(); };
 $('field-ball-toggle').onchange = () => { saveLayout(); if (state.run) drawField(); };
+$('field-sonar-toggle').onchange = () => { saveLayout(); if (state.run) drawField(); };
 $('field-elements-toggle').onchange = () => { saveLayout(); if (state.run) drawField(); };
 // The experimental 3D page lives in its own tab: it opens on this run and time, then follows
 // every seek through the 'buzzscope' channel. Nothing else here knows it exists.

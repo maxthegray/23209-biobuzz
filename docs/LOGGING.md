@@ -26,6 +26,11 @@ while (opModeIsActive()) {
 - `log.pose(x, y, heading)` is for opmodes with no Pedro follower that still know where the
   robot is (inches and radians).
 - `FlightRecorder.ENABLED = false` turns logging off everywhere.
+- The ultrasonics are logged on their own, nothing to add. To see them live while the robot
+  runs, turn on `LiveView.ultrasonic` in Panels (http://192.168.43.1:8001): the driver hub
+  shows `Ultrasonic  L … R … skew …`, and Panels' Graph tab can plot `Ultrasonic/leftIn` and
+  `rightIn`. It is off by default and goes back to off after a redeploy. It is done by the
+  recorder, so it needs `FlightRecorder.ENABLED` on.
 
 ## Where the files are
 
@@ -58,10 +63,13 @@ recorder started.
 | `loop/windowMaxTotalNanos` | whole number | the slowest loop since the last sample |
 | `Drive/motors/power`, `Drive/motors/velocityTps` | `double[]` | `[front left, front right, back left, back right]`: motor power and encoder speed in ticks per second. 50 times a second at most. Only when all four drive motors are in the config |
 | `Motors/<name>/power`, `Motors/<name>/velocityTps` | number | every other motor in the config |
+| `Ultrasonic/leftIn`, `Ultrasonic/rightIn` | number | the two front ultrasonics in inches, calibrated (`UltrasonicConfig`). NaN while a sensor's supply reads under 1 V. 20 times a second at most. Only when all four ultrasonic ports are in the config |
+| `Ultrasonic/leftRawIn`, `…/rightRawIn`, `…/leftSignalVolts`, `…/leftVccVolts`, `…/rightSignalVolts`, `…/rightVccVolts` | number | the same reading before calibration, and the two voltages it came from |
+| `Ultrasonic/mount/spacingIn`, `Ultrasonic/mount/setbackIn` | number | where the sensors sit (`UltrasonicConfig`), written once, so BuzzScope draws the beams in the right place |
 | `pose` | `double[]` | `[x in, y in, heading rad]` in Pedro's frame. Only with a follower or `log.pose` |
 | `velocity` | `double[]` | `[vx in/s, vy in/s, turn rad/s]`. Only with a follower |
 | `Field/Robot` | struct | the same pose in meters from the field center, for AdvantageScope |
-| anything else | | whatever the opmode puts: `Ultrasonic/…`, `WallApproach/…`, `Align/…`, `Ball/…`, `Auto/…`, `DriveToWall/…`, `FlowerApproach/…` |
+| anything else | | whatever the opmode puts: `WallApproach/…`, `Align/…`, `Ball/…`, `Auto/…`, `DriveToWall/…`, `FlowerApproach/…` |
 
 ### Names the tools depend on
 
@@ -71,7 +79,10 @@ break the robot, it silently empties a graph or a check:
 `events` (and the exact texts `start` and `stop`), `battery`, `hubs/control/volts`,
 `hubs/control/currentAmps`, `gamepad1/axes`, `gamepad1/buttons`, `gamepad2/axes`,
 `gamepad2/buttons`, `loop/totalNanos`, `loop/windowMaxTotalNanos`, `Drive/motors/power`,
-`Drive/motors/velocityTps`, `pose`, `velocity`, `opMode/kind`.
+`Drive/motors/velocityTps`, `pose`, `velocity`, `opMode/kind`, `Ultrasonic/leftIn`, `Ultrasonic/rightIn`,
+`Ultrasonic/leftRawIn`, `Ultrasonic/rightRawIn`, `Ultrasonic/leftSignalVolts`, `Ultrasonic/rightSignalVolts`,
+`Ultrasonic/leftVccVolts`, `Ultrasonic/rightVccVolts`, `Ultrasonic/mount/spacingIn`, `Ultrasonic/mount/setbackIn`,
+`WallApproach/wallIn`, `DriveToWall/targetIn`.
 
 The `TUNED` event format is read by `tools/logs/tuned.py`:
 `TUNED <File.java> <Class>.<field> <code value> -> <value now>`.
@@ -92,6 +103,10 @@ puts them in a folder, and end the name with the unit (`In`, `Deg`, `Volts`, `Px
   left alone, and there the read is free because the opmode already did it.
 - Motor power is free while the motor is being driven. For a motor nobody has set in half a
   second it is one hub read, and the recorder does at most one of those per loop.
+- The ultrasonics are read from the hub's bulk read too, at most 20 times a second (the sensor
+  only makes a new value every 100 ms). When the opmode already logged them that loop
+  (`WallApproach.log`), the recorder doesn't read them again and keeps the opmode's numbers,
+  which may use the flower dash's own calibration.
 - Any error inside the recorder turns the recorder off for that run. The opmode keeps going.
 
 These costs have not been measured on the robot yet. Compare `loop/totalNanos` with the

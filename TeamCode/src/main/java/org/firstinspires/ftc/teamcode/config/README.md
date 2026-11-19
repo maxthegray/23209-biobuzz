@@ -16,4 +16,5 @@ Numbers marked `public static` (no `final`) can also be tried live in Panels
 | the auto-alignment turn gains | `../opmodes/tests/flowerdash/UltrasonicAutoAlignment.java`, top |
 | ball PID gains, camera exposure, the yellow colour range | `BallVisionConfig.java` |
 | Starter Drive speed, or the 30 in limit | `DriveConfig.java` |
+| show the ultrasonics live on the driver hub / Panels Graph (an on/off switch, flip it in Panels) | `LiveView.java` |
 | Pedro drive / Pinpoint / follower numbers | `../pedro/Constants.java` (follower numbers come from AutoTune, leave them) |

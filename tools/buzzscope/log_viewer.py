@@ -34,7 +34,13 @@ PLAYBACK_CHANNELS = ("pose", "driveMode", "gamepad1/axes", "gamepad1/buttons",
                      "gamepad2/axes", "gamepad2/buttons", "commands/active", "commands/running",
                      "BallAssist/tx", "BallAssist/ty", "BallAssist/targetTy",
                      "Limelight/target/visible", "Limelight/target/txDegrees", "Limelight/target/tyDegrees",
-                     "Hive/RED/state", "Hive/BLUE/state")
+                     "Hive/RED/state", "Hive/BLUE/state",
+                     # the field's Sonar beams and the Sonar view
+                     "Ultrasonic/leftIn", "Ultrasonic/rightIn", "Ultrasonic/leftRawIn", "Ultrasonic/rightRawIn",
+                     "Ultrasonic/leftSignalVolts", "Ultrasonic/rightSignalVolts",
+                     "Ultrasonic/leftVccVolts", "Ultrasonic/rightVccVolts",
+                     "Ultrasonic/mount/spacingIn", "Ultrasonic/mount/setbackIn", "WallApproach/wallIn",
+                     "DriveToWall/targetIn")
 
 # Any camera subsystem's detections, whatever it is called: <Subsystem>/<one of these>.
 CAMERA_CHANNEL_SUFFIXES = tuple(
@@ -56,6 +62,7 @@ BROWNOUT_VOLTS = battery.BROWNOUT_VOLTS
 MIN_VALID_VOLTS = 1.0
 LOOP_SPIKE_MS = 50
 POSE_JUMP_IN = 3.0
+ULTRASONIC_MIN_VCC = 1.0   # same check as UltrasonicSensor.getDistanceMm
 # The last pose before the op-mode's stop event is often a reset, not motion.
 STOP_SETTLE_SEC = 0.1
 MERGE_GAP_SEC = 1.0
@@ -125,6 +132,15 @@ def problems(records, report):
         if first is not None:
             for start, end, _, active, _ in spans(series[first:], lambda v: v is False):
                 add(f"{subsystem} disconnected", "fault", start, end, f"for {lasted(active)}")
+
+    # The sensor's supply read under 1 V after it had been fine: a power wire came loose (UltrasonicSensor
+    # gives NaN then). A sensor that never had power is a config or wiring question, not a moment in the run.
+    for side in ("left", "right"):
+        series = [(ts, v) for ts, v in records.get(f"Ultrasonic/{side}VccVolts", []) if isinstance(v, float) and math.isfinite(v)]
+        first = next((i for i, (_, v) in enumerate(series) if v >= ULTRASONIC_MIN_VCC), None)
+        if first is not None:
+            for start, end, values, active, _ in spans(series[first:], lambda v: v < ULTRASONIC_MIN_VCC):
+                add(f"Ultrasonic {side} unpowered", "fault", start, end, f"Vcc {min(values):.2f} V for {lasted(active)}")
 
     for name, kind in (("Localizer/faulted", "Localizer fault"), ("Drive/odometryFallback", "Odometry fallback")):
         for start, end, _, active, _ in spans(records.get(name, []), lambda v: v is True):
@@ -435,6 +451,7 @@ def handler_for(library):
                              "/layout.js": ("layout.js", "text/javascript"),
                              "/charts.js": ("charts.js", "text/javascript"),
                              "/field-camera.js": ("field-camera.js", "text/javascript"),
+                             "/sonar.js": ("sonar.js", "text/javascript"),
                              "/overlays.js": ("overlays.js", "text/javascript"),
                              "/field-elements.js": ("field-elements.js", "text/javascript"),
                              # The experimental 3D page and its vendored three.js; see vendor/three/README.md.

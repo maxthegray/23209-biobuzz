@@ -11,7 +11,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from log_viewer import LogLibrary, ThreadingHTTPServer, camera_channels, handler_for, json_safe, match_info, match_timing, problems, scan_run
+from log_viewer import PLAYBACK_CHANNELS, LogLibrary, ThreadingHTTPServer, camera_channels, handler_for, json_safe, match_info, match_timing, problems, scan_run
 
 
 def fixture(truncated=False):
@@ -203,6 +203,17 @@ class ProblemTest(unittest.TestCase):
         records = {"Limelight/connected": seconds((0, False), (1, True), (2, False), (4, True)),
                    "BallCamera/connected": seconds((0, False), (9, False))}
         self.assertEqual([("Limelight disconnected", "fault", 2, 4, "for 2.00 s")], self.kinds(records))
+
+    def test_the_sonar_views_channels_are_sent_for_playback(self):
+        for name in ("Ultrasonic/leftIn", "Ultrasonic/rightIn", "Ultrasonic/leftVccVolts", "Ultrasonic/rightVccVolts",
+                     "Ultrasonic/mount/spacingIn", "Ultrasonic/mount/setbackIn"):
+            self.assertIn(name, PLAYBACK_CHANNELS)
+
+    def test_ultrasonic_unpowered_only_after_it_had_power(self):
+        records = {"Ultrasonic/leftVccVolts": seconds((0, 3.3), (1, 3.3), (2, 0.0), (3, 0.1), (4, 3.3)),
+                   "Ultrasonic/rightVccVolts": seconds((0, 0.0), (5, 0.0))}
+        self.assertEqual([("Ultrasonic left unpowered", "fault", 2, 4, "Vcc 0.00 V for 2.00 s")], self.kinds(records))
+        self.assertEqual([], self.kinds({"Ultrasonic/leftVccVolts": seconds((0, 3.3), (1, 3.29))}))
 
     def test_pose_jumps_and_word_bounded_fault_events(self):
         records = {"pose": seconds((0, [0.0, 0.0, 0.0]), (0.01, [1.0, 0.0, 0.0]), (0.02, [float("nan"), 0.0, 0.0]),

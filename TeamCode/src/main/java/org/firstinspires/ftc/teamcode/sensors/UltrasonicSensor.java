@@ -64,6 +64,21 @@ public class UltrasonicSensor {
                 hardwareMap.get(AnalogInput.class, HardwareNames.ULTRASONIC_RIGHT_VCC));
     }
 
+    // same as left/right, but null when the robot config doesn't have both ports (a robot without the sensors)
+    public static UltrasonicSensor tryLeft(HardwareMap hardwareMap) {
+        return tryGet(hardwareMap, HardwareNames.ULTRASONIC_LEFT_SIGNAL, HardwareNames.ULTRASONIC_LEFT_VCC);
+    }
+
+    public static UltrasonicSensor tryRight(HardwareMap hardwareMap) {
+        return tryGet(hardwareMap, HardwareNames.ULTRASONIC_RIGHT_SIGNAL, HardwareNames.ULTRASONIC_RIGHT_VCC);
+    }
+
+    private static UltrasonicSensor tryGet(HardwareMap hardwareMap, String signalName, String vccName) {
+        AnalogInput signal = hardwareMap.tryGet(AnalogInput.class, signalName);
+        AnalogInput vcc = hardwareMap.tryGet(AnalogInput.class, vccName);
+        return signal == null || vcc == null ? null : new UltrasonicSensor(signal, vcc);
+    }
+
     // how many seconds of readings get averaged. longer = smoother but slower to react
     public void setWindowSec(double sec) {
         windowSec = Math.max(0.0, sec);

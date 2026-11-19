@@ -1,10 +1,44 @@
-import {finite, indexAt, sampleAt, fieldPoint, ROBOT_HALF_IN, ballSighting, ballEstimate, sightingMount, loggedCameraMount, cameraDetections, POLLEN_DIAMETER_IN} from './core.mjs';
+import {finite, indexAt, sampleAt, fieldPoint, ROBOT_HALF_IN, ballSighting, ballEstimate, sightingMount, loggedCameraMount, cameraDetections, POLLEN_DIAMETER_IN, sonarReading, sonarBeams, SONAR_TOO_FAR_IN} from './core.mjs';
 import {$, state, fmt, fmtTime, node, context, colors, problemColor} from './ui.js';
 import {shownOverlays} from './overlays.js';
 import {drawBiobuzz, drawTileNames, hiveStates} from './field-elements.js';
 
 // Past this the estimate moves by feet per degree of ty, so only the direction is drawn.
 const BALL_TRUST_IN = 48;
+
+// The two ultrasonic beams, from each sensor face straight ahead to what it saw, with a short line
+// across the end for the wall. Dashed past SONAR_TOO_FAR_IN (the robot wouldn't trust it), and a red
+// ✕ at the sensor for a bad reading. The status chip has the numbers even when there's no pose.
+function drawSonar(ctx, pose, drawable, view, left, top, size) {
+  const shown = !$('field-sonar-option').hidden && $('field-sonar-toggle').checked;
+  $('sonar-status').hidden = !shown;
+  if (!shown) return;
+  const reading = sonarReading(state.run.playback, state.time);
+  const text = value => value === null ? '—' : finite(value) ? fmt(value, 1) : '?';
+  $('sonar-status').textContent = !reading ? 'No ultrasonic sample'
+    : `Sonar L ${text(reading.leftIn)} · R ${text(reading.rightIn)} in${reading.angleDeg === null ? '' : ` · ${fmt(Math.abs(reading.angleDeg), 1)}° ${reading.angleDeg >= 0 ? 'right' : 'left'}`}`;
+  if (!drawable || !reading) return;
+  const scale = size / view.span, tick = Math.max(4, 2 * scale);
+  for (const beam of sonarBeams(pose, reading)) {
+    const [sx, sy] = fieldPoint(beam.start, view, left, top, size);
+    ctx.lineWidth = 2;
+    if (beam.state === 'bad') {
+      ctx.strokeStyle = colors.red; ctx.beginPath();
+      ctx.moveTo(sx - 3, sy - 3); ctx.lineTo(sx + 3, sy + 3); ctx.moveTo(sx + 3, sy - 3); ctx.lineTo(sx - 3, sy + 3); ctx.stroke();
+      continue;
+    }
+    const [ex, ey] = fieldPoint(beam.end, view, left, top, size);
+    ctx.strokeStyle = colors.sonar; ctx.globalAlpha = beam.state === 'far' ? 0.55 : 1;
+    ctx.setLineDash(beam.state === 'far' ? [5, 4] : []);
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+    if (beam.state === 'ok') {
+      // across the beam on screen: the beam's direction turned a quarter turn
+      const length = Math.hypot(ex - sx, ey - sy) || 1, nx = -(ey - sy) / length * tick, ny = (ex - sx) / length * tick;
+      ctx.beginPath(); ctx.moveTo(ex - nx, ey - ny); ctx.lineTo(ex + nx, ey + ny); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
 
 export function drawField() {
   if (!state.run || !$('field').clientWidth) return;
@@ -158,6 +192,7 @@ export function drawField() {
       ctx.arc(endX, endY, ballRadius, 0, Math.PI * 2); ctx.fill();
     }
   }
+  drawSonar(ctx, pose, valid && !offView, view, left, top, size);
   // The view holds the robot's body; its heading arrow may reach past it, so it isn't clipped.
   ctx.restore(); ctx.save();
   if (offView) {

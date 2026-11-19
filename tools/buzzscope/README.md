@@ -168,6 +168,19 @@ reduced trail; the coordinate readout always uses the full pose series.
   from every camera with a logged mount are outlined in range. Farther, or with no ty or mount, the ray
   is dashed and direction-only: past that range, one degree of ty moves the
   estimate by feet. Angles more than 250 ms old are hidden.
+- **Sonar** (shown when the log has `Ultrasonic/leftIn` or `rightIn`, on by
+  default, saved) draws a beam from each front ultrasonic straight ahead to
+  what it saw, with a short line across the end. Dashed past 30 in
+  (`tooFarIn`: the robot won't drive on it); a red ✕ at the sensor for a bad
+  reading (no supply, or under 1 in). Readings older than 0.3 s are hidden. The
+  chip at the top right gives both distances and how crooked the robot is to
+  the wall, even when the log has no pose to draw from. The sensor spacing and
+  setback come from `Ultrasonic/mount/…` in the log, or 7.5 in and 0 in older
+  logs.
+- **Sonar** in **+ View** is the same two readings as bars, 0 to 30 in, with the
+  raw reading and signal/supply volts under each, the skew, `WallApproach/wallIn`
+  and, when the op-mode logged `DriveToWall/targetIn`, a line across both bars
+  at the distance it was driving to. × closes it.
 - **Camera** is a view of the camera frame itself: every candidate blob the
   detector published, at its pixel position and radius. The selected blob is
   filled and labelled with its angles, accepted blobs are outlined, and
@@ -195,7 +208,9 @@ reduced trail; the coordinate readout always uses the full pose series.
   look. It is off when the viewer opens, so nothing is drawn until you ask.
   The rules use channels already logged: battery under 9.5 V (a fault under
   8 V; readings of 1 V or less are ignored as dead), loops over 50 ms
-  (skipping the two startup loops), `<Subsystem>/connected` going false
+  (skipping the two startup loops), an ultrasonic's supply
+  (`Ultrasonic/<left|right>VccVolts`) dropping under 1 V after it was fine,
+  `<Subsystem>/connected` going false
   after it was true, `Localizer/faulted`, `Drive/odometryFallback`, pose
   jumps over 3 in between samples (not the reset as the op-mode stops),
   fault events, failed commands, lost command records, a cut-off log end,

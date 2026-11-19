@@ -25,6 +25,21 @@ That prints every command. The ones you will use most:
 | put the code on the robot | `make deploy` |
 | copy the last 2 run logs to my laptop | `make pull-logs 2` |
 | look at a run | `make viewer` then open http://127.0.0.1:8008 |
+| get a quick summary of the newest log | `make analyze` |
+| tune numbers live (Panels) | open [192.168.43.1:8001](http://192.168.43.1:8001) while connected to the robot |
+| see which deploy it would do, change nothing | `make check-deploy` |
+| force a full install / force a hot reload | `make install` / `make hot` |
+| remove hot-reloaded code from the hub | `make unsloth` |
+| see the numbers I changed live in Panels | `make tuned` |
+
+## Ports on the hub
+
+| Port | What |
+|---|---|
+| [8080](http://192.168.43.1:8080) | robot controller page |
+| [8001](http://192.168.43.1:8001) | Panels |
+| [10158](http://192.168.43.1:10158) | Pedro AutoTune (websocket on 12649) |
+| [8765](http://192.168.43.1:8765), [8766](http://192.168.43.1:8766), [8767](http://192.168.43.1:8767), [8768](http://192.168.43.1:8768), [8769](http://192.168.43.1:8769), [8770](http://192.168.43.1:8770) | flower dash (uses the first free one, the driver hub shows which) |
 
 ## A normal day
 
@@ -68,8 +83,28 @@ This repo has a `CLAUDE.md`, two agents and a skill, so you can say things like
 "deploy this", "why did that run stop short?" or "save my tuning" and Claude knows which
 commands to run. See the last section of [docs/TOOLS.md](docs/TOOLS.md).
 
+## After a run: reading a log
+
+1. `make pull-logs 2` (the hub must be reachable).
+2. `make analyze` gives loop time, battery and the event timeline for the newest log.
+3. To look at one thing closely:
+   `python3 tools/logs/analyze_wpilog.py --channel Ultrasonic/leftIn,WallApproach/toGoIn`
+   (any channel names; the list is in [docs/LOGGING.md](docs/LOGGING.md)).
+4. Times count from `start`, so anything during init is negative.
+
+## If something goes wrong
+
+- Plain `./gradlew` fails on this Mac (default Java is 24). Use `make`, or set `JAVA_HOME`
+  to JDK 21.
+- `adb` is not on PATH. The scripts find it through `local.properties`.
+- The flower dash page is an asset, so a hot reload won't update it. It needs a full
+  install (`make deploy` knows this).
+
 ## Things to know
 
+- Don't touch these: `FtcRobotController/`, `build.common.gradle`, `libs/` (FTC SDK files),
+  `pedro/procedures/` and `pedro/Tuning.java` (Pedro's tuners), and the follower numbers
+  in `pedro/Constants.java` (they come from AutoTune runs).
 - Don't edit gradle files without asking: the versions are pinned on purpose (Sloth 0.2.4).
 - Numbers changed live in Panels are **not saved**. They reset on the next init. Use
   `make tuned` to see what to copy into the code.

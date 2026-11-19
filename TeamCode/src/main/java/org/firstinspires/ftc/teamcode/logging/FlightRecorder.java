@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.logging;
 
+import com.bylazar.telemetry.PanelsTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.pedropathing.math.Velocity;
@@ -18,6 +19,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.VoltageUnit;
 import org.firstinspires.ftc.robotcore.internal.system.AppUtil;
 import org.firstinspires.ftc.teamcode.config.HardwareNames;
+import org.firstinspires.ftc.teamcode.config.LiveView;
+import org.firstinspires.ftc.teamcode.config.UltrasonicConfig;
+import org.firstinspires.ftc.teamcode.sensors.UltrasonicSensor;
 import org.firstinspires.ftc.teamcode.tuning.Tunables;
 
 import java.io.File;
@@ -46,8 +50,11 @@ import java.util.Map;
 //         log.update();                                           // once per loop, after the puts
 //     }
 //
-// saved on its own: battery volts, hub current, both gamepads, loop time, drive motor power + speed, and
-// "start" / "stop". it closes itself when the opmode ends.
+// saved on its own: battery volts, hub current, both gamepads, loop time, drive motor power + speed, the two
+// ultrasonic sensors, and "start" / "stop". it closes itself when the opmode ends.
+//
+// with LiveView.ultrasonic on (flip it in Panels) the ultrasonic distances also show live on the driver hub and in
+// Panels' Graph tab.
 //
 // it also watches the numbers you can tune live in Panels (see tuning/Tunables.java): while one is different
 // from the code, the driver hub shows COPY INTO CODE with the file and the new value, and the log gets a TUNED event.
@@ -76,6 +83,8 @@ public final class FlightRecorder {
     private static final long MOTOR_INTERVAL_NS = 20_000_000L;   // motors 50 times a second at most
     private static final long SLOW_READ_NS = 500_000L;   // a read this slow went to the hub instead of the cache
     private static final long TUNED_INTERVAL_NS = 250_000_000L;   // look for Panels changes 4 times a second
+    private static final long ULTRASONIC_INTERVAL_NS = 50_000_000L;   // 20 times a second, the sensor only makes a new value every 100 ms
+    private static final long LIVE_INTERVAL_NS = 100_000_000L;   // live ultrasonic view 10 times a second
 
     // for AdvantageScope's field: it wants meters from the field center, turned a quarter turn from pedro's axes
     // this season (red wall on the audience's left)
@@ -101,6 +110,14 @@ public final class FlightRecorder {
     private final double[] drivePower = new double[4], driveVelocity = new double[4];
     private int nextPower;
     private long lastMotorNs;
+
+    // null when the robot config doesn't have them
+    private UltrasonicSensor leftSonar, rightSonar;
+    private long lastSonarNs, lastLiveNs;
+    private boolean sonarMountLogged;
+    private double liveLeftIn = Double.NaN, liveRightIn = Double.NaN;
+    private Telemetry.Item liveItem;
+    private boolean panelsBroken;
 
     private final double[] axes = new double[6];
     private final double[] poseValues = new double[3], velocityValues = new double[3];
@@ -243,6 +260,10 @@ public final class FlightRecorder {
                 lastTunedNs = now;
                 checkTuned(c);
             }
+            if (now - lastLiveNs >= LIVE_INTERVAL_NS) {
+                lastLiveNs = now;
+                showLive();
+            }
 
             if (!c.sampleDue()) {
                 c.discard();
@@ -259,6 +280,10 @@ public final class FlightRecorder {
                 sampleMotors(c);
             }
             if (follower != null) samplePose(c);
+            if (now - lastSonarNs >= ULTRASONIC_INTERVAL_NS) {
+                lastSonarNs = now;
+                sampleUltrasonics(c);
+            }
             c.commit();
         } catch (Throwable t) {
             fail(t);
@@ -302,6 +327,9 @@ public final class FlightRecorder {
 
         findHubs();
         findMotors();
+        leftSonar = UltrasonicSensor.tryLeft(opMode.hardwareMap);
+        rightSonar = UltrasonicSensor.tryRight(opMode.hardwareMap);
+        if (leftSonar == null || rightSonar == null) leftSonar = rightSonar = null;   // both or neither, the viewer draws them as a pair
         LogCore c = new LogCore(System::nanoTime, sink, "23209-biobuzz", this::background);
         c.schema("Translation2d", "double x;double y;");
         c.schema("Rotation2d", "double value;");
@@ -436,6 +464,69 @@ public final class FlightRecorder {
             c.put(motorPowerName[i], power[i]);
             c.put(motorVelocityName[i], velocity[i]);
         }
+    }
+
+    // the two ultrasonics, under the same names WallApproach uses. when the opmode already put them this loop
+    // (WallApproach.log), its numbers win: it may use the flower dash's calibration instead of UltrasonicConfig's.
+    // the voltages come out of the hub's bulk read, like the motor speeds
+    private void sampleUltrasonics(LogCore c) {
+        if (leftSonar == null) return;
+        if (!sonarMountLogged) {
+            sonarMountLogged = true;
+            // where the sensors sit, so BuzzScope draws the beams from the right spot
+            c.put("Ultrasonic/mount/spacingIn", UltrasonicConfig.sensorSpacingIn);
+            c.put("Ultrasonic/mount/setbackIn", UltrasonicConfig.sensorSetbackIn);
+        }
+        if (c.pending("Ultrasonic/leftIn")) {
+            liveLeftIn = c.pendingDouble("Ultrasonic/leftIn");
+            liveRightIn = c.pendingDouble("Ultrasonic/rightIn");
+            return;
+        }
+        double leftRawIn = leftSonar.getDistanceIn();
+        double rightRawIn = rightSonar.getDistanceIn();
+        liveLeftIn = UltrasonicConfig.left(leftRawIn);
+        liveRightIn = UltrasonicConfig.right(rightRawIn);
+        c.put("Ultrasonic/leftSignalVolts", leftSonar.lastSignalVoltage());
+        c.put("Ultrasonic/leftVccVolts", leftSonar.lastVccVoltage());
+        c.put("Ultrasonic/rightSignalVolts", rightSonar.lastSignalVoltage());
+        c.put("Ultrasonic/rightVccVolts", rightSonar.lastVccVoltage());
+        c.put("Ultrasonic/leftRawIn", leftRawIn);
+        c.put("Ultrasonic/rightRawIn", rightRawIn);
+        c.put("Ultrasonic/leftIn", liveLeftIn);
+        c.put("Ultrasonic/rightIn", liveRightIn);
+    }
+
+    // LiveView.ultrasonic: one line on the driver hub, and the two numbers in Panels for its Graph tab.
+    // uses what sampleUltrasonics read, so it costs no hub reads
+    private void showLive() {
+        Telemetry telemetry = opMode.telemetry;
+        boolean on = LiveView.ultrasonic && leftSonar != null;
+        if (!on) {
+            if (liveItem != null && telemetry != null) telemetry.removeItem(liveItem);
+            liveItem = null;
+            return;
+        }
+        String text = String.format(Locale.US, "L %s   R %s   skew %s", inches(liveLeftIn), inches(liveRightIn),
+                inches(liveLeftIn - liveRightIn));
+        if (telemetry != null) {
+            // retained = it stays on the driver hub every update, the opmode doesn't have to add it
+            if (liveItem == null) liveItem = telemetry.addData("Ultrasonic", text).setRetained(true);
+            else liveItem.setValue(text);
+        }
+        if (panelsBroken) return;
+        try {
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Ultrasonic/leftIn", liveLeftIn);
+            PanelsTelemetry.INSTANCE.getTelemetry().addData("Ultrasonic/rightIn", liveRightIn);
+            PanelsTelemetry.INSTANCE.getTelemetry().update();
+        } catch (Throwable t) {
+            // Panels missing or broken: keep the driver hub line and the log, just stop sending to Panels
+            panelsBroken = true;
+            RobotLog.ww("FlightRecorder", t, "no Panels telemetry for the live ultrasonic view");
+        }
+    }
+
+    private static String inches(double v) {
+        return Double.isNaN(v) ? "--" : String.format(Locale.US, "%.1f in", v);
     }
 
     private void samplePose(LogCore c) {

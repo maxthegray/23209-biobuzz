@@ -90,6 +90,25 @@ public class LogCoreTest {
         for (WpiLogReader.Record r : log.records) assertEquals(5000, r.timestampUs);
     }
 
+    // the recorder uses this to skip its own ultrasonic reading when the opmode already logged one this loop
+    @Test
+    public void pendingSaysWhatWasPutThisLoop() throws Exception {
+        MemorySink sink = new MemorySink();
+        LogCore core = new LogCore(clock, sink, "", null);
+        assertFalse(core.pending("u/leftIn"));
+        core.put("u/leftIn", 12.5);
+        assertTrue(core.pending("u/leftIn"));
+        assertEquals(12.5, core.pendingDouble("u/leftIn"), 0);
+        assertTrue(Double.isNaN(core.pendingDouble("u/other")));
+        core.commit();
+        assertFalse(core.pending("u/leftIn"));
+        assertTrue(Double.isNaN(core.pendingDouble("u/leftIn")));
+        core.put("u/leftIn", 3);
+        core.discard();
+        assertFalse(core.pending("u/leftIn"));
+        finish(core, sink);
+    }
+
     @Test
     public void aFastLoopStillOnlySaves100SamplesASecond() throws Exception {
         MemorySink sink = new MemorySink();
