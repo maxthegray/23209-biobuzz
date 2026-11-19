@@ -30,12 +30,12 @@ public class WallApproach {
     // the final ones are limits and stay put, so a typo in Panels can't send the robot into the wall
 
     // measuring: stand still, let the readings settle, then average them
-    public static double settleSec = 0.4;   // after stopping, let the sensor's filter catch up
+    public static double settleSec = 0.3;   // after stopping, let the sensor's filter catch up
     public static double averageSec = 0.2;   // then average this long, the flicker between steps averages out
     public static double maxStep = 4.0;   // in, longest single move before it measures again
     public static double farStep = 0.8;   // further than maxStep away = go 80% of it, then measure again
     public static double trustMove = 2.5;   // in. a straight move this short lands where it measured, no need to stop and measure again
-    public static int maxShifts = 3;   // sideways tries at finding the flower (3.75, 1.9, 0.9 in)
+    public static int maxShifts = 0;   // sideways tries at finding the flower (3.75, 1.9, 0.9 in). 0 = off: the pod offsets are right now, so pedro centers it and a shift only pulls it off
 
     // when it's done
     public static double distanceTolerance = 0.75;   // the sensor is only good to about half an inch, chasing less than that just wastes time

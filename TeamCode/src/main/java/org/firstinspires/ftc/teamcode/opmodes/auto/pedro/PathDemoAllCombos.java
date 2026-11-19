@@ -16,6 +16,7 @@ import com.qualcomm.robotcore.util.Range;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.logging.FlightRecorder;
 import org.firstinspires.ftc.teamcode.mechanisms.PointDrive;
+import org.firstinspires.ftc.teamcode.config.UltrasonicConfig;
 import org.firstinspires.ftc.teamcode.mechanisms.WallApproach;
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 
@@ -54,10 +55,11 @@ public class PathDemoAllCombos extends LinearOpMode {
     // so being even an inch off center puts a sensor on the flower
     private static final double flowerCenter = 46.75;
     // a flower's front is 5.4 in off the wall. these are frame-to-wall distances, the mounts are 2 in closer than that
+    private static final double pickupFromWall = UltrasonicConfig.stopDistanceIn + 0.5;   // frame to wall. half an inch short of where the ultrasonics stop, so they barely have to move
     private static final Pose sideFlowerLineup = pose(17 + halfRobot, flowerCenter, 180);   // frame 17 in off the wall
-    private static final Pose sideFlowerPickup = pose(10.4 + halfRobot, flowerCenter, 180);   // frame 10.4 in off, so the mounts are 3 in from the flower. the ultrasonics do the last 2 in
+    private static final Pose sideFlowerPickup = pose(pickupFromWall + halfRobot, flowerCenter, 180);
     private static final Pose rearFlowerLineup = pose(flowerCenter, fieldSize - 17 - halfRobot, 90);
-    private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - 10.4 - halfRobot, 90);
+    private static final Pose rearFlowerPickup = pose(flowerCenter, fieldSize - pickupFromWall - halfRobot, 90);
     private static final Pose climbCorner1 = new Pose(24, 30);   // pass-through spots that take it round the left of the hive
     private static final Pose climbCorner2 = new Pose(20, 104);
 
@@ -88,6 +90,7 @@ public class PathDemoAllCombos extends LinearOpMode {
     private static final double bumperToCenter = halfRobot;
     private static final boolean fixPoseAtWall = false;   // true = let the wall reading correct pedro's position after the adjust
     private static final double maxPoseFix = 4.0;   // ultrasonics disagree with pedro by more than this = don't trust them
+    private static final double adjustSec = 2.0;   // the ultrasonics get this long, then it intakes from where it is
     private static final double maxAdjust = 8.0;   // the adjust can't take it further than this from pedro's pickup spot (it slides up to ~6.5 in sideways to find the flower)
 
     private Follower follower;
@@ -241,7 +244,8 @@ public class PathDemoAllCombos extends LinearOpMode {
         sonar.start();
         WallApproach.Result result = WallApproach.Result.RUNNING;
         boolean wandered = false;
-        while (opModeIsActive() && result == WallApproach.Result.RUNNING && !outOfTime()) {
+        double startedAt = timer.seconds();
+        while (opModeIsActive() && result == WallApproach.Result.RUNNING && !outOfTime() && timer.seconds() - startedAt < adjustSec) {
             result = sonar.update(follower, leftOf(pickup));
             follower.update();
             wandered = follower.pose().distance(pickup) > maxAdjust;   // bad readings would drive it off somewhere, pedro is the boss
